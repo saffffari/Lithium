@@ -81,6 +81,9 @@ def main():
     if args.project_id not in projects:
         raise KeyError(f"project {args.project_id!r} not in projects.json")
     project = projects[args.project_id]
+    # v2 label layout: read this project's own label namespace.
+    from src.data import cloud_store
+    cloud_store.set_active_label_namespace(args.project_id)
     registry = build_registry(project)
     print(f"Project: {project['name']}")
     print(f"Registry labels (non-zero): "

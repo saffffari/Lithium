@@ -157,7 +157,12 @@ def main() -> int:
     ap.add_argument("--force", action="store_true",
                     help="Re-propagate even when preview_labels already "
                          "exist. Use after a label re-import.")
+    ap.add_argument("--label-namespace", default=None, metavar="PROJECT_ID",
+                    help="v2 label namespace to backfill (a project id). "
+                         "Default: the shared _library namespace.")
     args = ap.parse_args()
+    from src.data import cloud_store
+    cloud_store.set_active_label_namespace(args.label_namespace)
     return backfill(force=args.force)
 
 

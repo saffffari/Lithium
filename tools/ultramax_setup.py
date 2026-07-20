@@ -154,6 +154,12 @@ def main() -> int:
     print(f"  copied ontology ({len(dense_proj.ontology_data.get('labels', []))} labels)")
     print()
 
+    # v2 label layout: sparse labels are read from the SOURCE project's
+    # namespace; the propagated dense labels are written to the dense
+    # project's namespace.
+    from src.data import cloud_store
+    cloud_store.set_active_label_namespace(dense_proj.id)
+
     # ---- Step 4: build sparse lookup from source project labels ----
     print(f"Step 4: indexing labeled clouds from {SOURCE_PROJECT_NAME}...")
     sparse_by_name: dict[str, tuple] = {}
@@ -166,7 +172,7 @@ def main() -> int:
         if cached is None:
             continue
         sc, _ = cached
-        lbl = load_cloud_labels(fk)
+        lbl = load_cloud_labels(fk, namespace=src_proj.id)
         if lbl is not None and len(lbl) == sc.point_count and (lbl != 0).any():
             sparse_by_name[name] = (sc.positions, lbl.astype(np.int32))
     print(f"  {len(sparse_by_name)} labeled sparse clouds available")

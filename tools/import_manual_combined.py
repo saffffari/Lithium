@@ -111,6 +111,9 @@ def main():
             print(f"  created project '{PROJECT_NAME}' ({proj.id}) — 7-class combined ontology")
         else:
             print(f"  reusing project '{PROJECT_NAME}' ({proj.id})")
+        # v2 label layout: label writes land in this project's namespace.
+        from src.data import cloud_store
+        cloud_store.set_active_label_namespace(proj.id)
 
     keys, n_named, hist = [], 0, np.zeros(len(NAMES), dtype=np.int64)
     for i, d in enumerate(scenes):

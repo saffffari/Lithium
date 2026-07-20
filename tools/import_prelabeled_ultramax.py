@@ -90,6 +90,10 @@ def main() -> int:
 
     cat = LibraryCatalog()
     proj = find_or_create_project(cat, args.dry_run)
+    if proj is not None:
+        # v2 label layout: label writes land in this project's namespace.
+        from src.data import cloud_store
+        cloud_store.set_active_label_namespace(proj.id)
 
     keys: list[str] = []
     hist = np.zeros(len(NAMES), dtype=np.int64)
