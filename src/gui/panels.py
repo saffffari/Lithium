@@ -195,6 +195,20 @@ def draw_settings_panel(app) -> bool:
     changed = False
     sw = sidebar_width()
 
+    # Selection hygiene: a view switch invalidates every index-based
+    # selection set (indices point into the OLD entries list — carrying
+    # them over used to export / infer on the wrong clouds after
+    # switching to a smaller project).
+    global _train_selected, _train_label_sel
+    _cur_view = getattr(app, 'active_view', None)
+    if _cur_view != getattr(app, '_panels_last_view', ('__unset__',)):
+        app._panels_last_view = _cur_view
+        _train_selected.clear()
+        _train_label_sel = None
+        cs_sel = getattr(app, 'contact_sheets_selected', None)
+        if cs_sel:
+            cs_sel.clear()
+
     menu_h = getattr(app, '_menu_bar_height', 0.0)
     imgui.set_next_window_position(0, menu_h, imgui.ALWAYS)
     imgui.set_next_window_size(sw, max(1, app.height - int(menu_h)), imgui.ALWAYS)
@@ -1602,10 +1616,16 @@ def _draw_labels_section(app, child_id: str = "##labels") -> bool:
 
 
 def _draw_contact_sheets_tab(app) -> bool:
-    """Contact Sheets tab — clouds + labels + import + point size.
+    """Contact Sheets tab — project intake and shaping.
 
-    Same clouds and labels panels as Light Table, plus IMPORT buttons
-    and the sphere+knob point size gauge.
+    Workflow order, top to bottom: IMPORT (bring clouds in) →
+    PROJECTS (pick/create the working set) → ONTOLOGY (define the
+    label classes for this project) → CLOUDS (membership + selection)
+    → LABELS (this project's palette) → POINT SIZE.
+
+    Inference moved out in 1.1: batch runs live on the TRAIN tab next
+    to the models they use; single-cloud runs live on the Light Table
+    INFER button.
     """
     changed = False
     th = imgui.get_text_line_height()
@@ -1623,6 +1643,12 @@ def _draw_contact_sheets_tab(app) -> bool:
     _draw_library_panel(app)
     imgui.spacing()
 
+    # --- ONTOLOGY (label-set preset for the active project) ---
+    # Sits directly under PROJECTS: pick a project, then define its
+    # classes, then look at its clouds. (This picker existed in 1.0
+    # but was orphaned — defined and never drawn.)
+    changed |= _draw_ontology_picker(app)
+
     # --- CLOUDS (scrollable list) ---
     changed |= _draw_clouds_section(app)
 
@@ -1638,28 +1664,21 @@ def _draw_contact_sheets_tab(app) -> bool:
         changed |= c
     imgui.spacing()
 
-    # --- INFERENCE (run trained model on selected clouds) ---
-    _blue_tint = (OP1_BLUE[0] * 0.10, OP1_BLUE[1] * 0.10,
-                  OP1_BLUE[2] * 0.10, 1.0)
-    if op1_section("INFERENCE", OP1_BLUE, fill_color=_blue_tint, collapsible=False):
-        _draw_inference_section(app)
-    imgui.spacing()
-
     return changed
 
 
 def _draw_inference_section(app) -> None:
-    """The body of the Contact Sheets INFERENCE section.
+    """The body of the TRAIN tab's BATCH INFERENCE section.
 
-    Shows a status line and the run/cancel button. Ctrl/Shift-clicking
-    cloud rows in the CLOUDS list above populates the multi-select set
-    that this button operates over; if no clouds are selected, the
-    button falls back to the single ``selected_index``.
+    Shows a status line and the run/cancel button. Operates over the
+    SELECT CLOUDS checkbox set at the top of the tab (``_train_selected``
+    — the same set the export uses); falls back to the single
+    ``selected_index`` when nothing is checked.
     """
     th = imgui.get_text_line_height()
     runner = getattr(app, 'contact_sheets_infer_runner', None)
     is_running = runner is not None and runner.running
-    multi_set: set[int] = getattr(app, 'contact_sheets_selected', set()) or set()
+    multi_set: set[int] = set(_train_selected)
 
     # ---- status line + progress bar ----
     if is_running and runner.current is not None:
@@ -2030,6 +2049,26 @@ def _draw_light_table_tab(app) -> bool:
     # POINT SIZE / DISPLAY / DISPLAY MODE / CLIP / CAMERA — shared with
     # HOLOGRAM so visual tweaks transfer between workflows.
     changed |= _draw_viewport_view_controls(app)
+
+    # --- INFER (cloud-constellation loader button, 1.1) ---
+    # Runs the active project's model on the current cloud through the
+    # same runner/namespace/undo path as batch inference.
+    from src.gui.infer_widget import draw_light_table_infer
+    _ckpt = _resolve_inference_checkpoint(app)
+    _project_id = _resolve_active_project_id(app)
+    _chosen = _resolve_inference_model(app, _project_id) if _ckpt else None
+    _mdl_label = (_chosen.name if _chosen is not None
+                  else (os.path.basename(_ckpt) if _ckpt else None))
+    _runner_busy = (getattr(app, 'contact_sheets_infer_runner', None)
+                    is not None
+                    and app.contact_sheets_infer_runner.running)
+    draw_light_table_infer(
+        app,
+        start_infer=_start_batch_inference,
+        model_label=_mdl_label,
+        can_run=bool(_ckpt) and not _runner_busy,
+        registry=app.label_registry,
+    )
 
     return changed
 
@@ -2418,58 +2457,62 @@ def _draw_train_tab(app):
         staging = []
         app.dataset_staging = staging
 
-    op1_section(f"STAGED DATASET  ({len(staging)})", GREEN)
+    # Advanced path for mixed multi-filter exports; the common
+    # select→export flow doesn't need it, so it starts collapsed.
+    # Stable title (no count) so the collapse-state key doesn't reset
+    # every add/remove; 1.0 also ignored the open/closed return, so
+    # collapsing the header hid nothing.
+    if op1_section("STAGED DATASET", GREEN, default_collapsed=True):
+        # Memoise the sum across staged clouds; it only changes on
+        # add/remove and those paths bump `_dataset_staging_version`.
+        _staging_version = getattr(app, '_dataset_staging_version', 0)
+        _cached_total = getattr(app, '_dataset_staging_total_pts', None)
+        _cached_version = getattr(app, '_dataset_staging_total_version', -1)
+        if _cached_total is None or _cached_version != _staging_version:
+            total_pts = sum(int(item['cloud'].point_count) for item in staging)
+            app._dataset_staging_total_pts = total_pts
+            app._dataset_staging_total_version = _staging_version
+        else:
+            total_pts = _cached_total
+        imgui.text_colored(
+            f"{len(staging)} clouds   {total_pts:,} pts total", *DIM[:3])
 
-    # Memoise the sum across staged clouds; it only changes on
-    # add/remove and those paths bump `_dataset_staging_version`.
-    _staging_version = getattr(app, '_dataset_staging_version', 0)
-    _cached_total = getattr(app, '_dataset_staging_total_pts', None)
-    _cached_version = getattr(app, '_dataset_staging_total_version', -1)
-    if _cached_total is None or _cached_version != _staging_version:
-        total_pts = sum(int(item['cloud'].point_count) for item in staging)
-        app._dataset_staging_total_pts = total_pts
-        app._dataset_staging_total_version = _staging_version
-    else:
-        total_pts = _cached_total
-    imgui.text_colored(
-        f"{len(staging)} clouds   {total_pts:,} pts total", *DIM[:3])
+        can_add = bool(_train_selected) and bool(app.entries)
+        btn_color = GREEN if can_add else DIM
+        if _styled_button(
+                f"ADD {len(_train_selected)} SELECTED → STAGED",
+                btn_color):
+            if can_add:
+                _add_to_staged(app)
 
-    can_add = bool(_train_selected) and bool(app.entries)
-    btn_color = GREEN if can_add else DIM
-    if _styled_button(
-            f"ADD {len(_train_selected)} SELECTED → STAGED",
-            btn_color):
-        if can_add:
-            _add_to_staged(app)
+        if staging:
+            stg_h = min(th * 8.0, th * max(2.0, len(staging) * 1.6))
+            imgui.push_style_color(imgui.COLOR_CHILD_BACKGROUND, 0.05, 0.05, 0.05, 1.0)
+            imgui.begin_child("##staged_list", 0, stg_h, border=False)
+            remove_idx = -1
+            for si, item in enumerate(staging):
+                name = item['name'][:22]
+                pts = item['cloud'].point_count
+                pts_str = (f"{pts // 1000}K" if pts >= 1000 else f"{pts}")
+                f = item['label_filter']
+                filt_str = "all" if f is None else f"{len(f)} lbl"
+                if imgui.button(f"x##rm_{si}", width=s(24)):
+                    remove_idx = si
+                imgui.same_line()
+                imgui.text(f"[{si:02d}] {name}")
+                imgui.same_line()
+                imgui.text_colored(f"{pts_str}  {filt_str}", *DIM[:3])
+            if remove_idx >= 0:
+                staging.pop(remove_idx)
+                app._dataset_staging_version = getattr(app, '_dataset_staging_version', 0) + 1
+            imgui.end_child()
+            imgui.pop_style_color(1)
 
-    if staging:
-        stg_h = min(th * 8.0, th * max(2.0, len(staging) * 1.6))
-        imgui.push_style_color(imgui.COLOR_CHILD_BACKGROUND, 0.05, 0.05, 0.05, 1.0)
-        imgui.begin_child("##staged_list", 0, stg_h, border=False)
-        remove_idx = -1
-        for si, item in enumerate(staging):
-            name = item['name'][:22]
-            pts = item['cloud'].point_count
-            pts_str = (f"{pts // 1000}K" if pts >= 1000 else f"{pts}")
-            f = item['label_filter']
-            filt_str = "all" if f is None else f"{len(f)} lbl"
-            if imgui.button(f"x##rm_{si}", width=s(24)):
-                remove_idx = si
-            imgui.same_line()
-            imgui.text(f"[{si:02d}] {name}")
-            imgui.same_line()
-            imgui.text_colored(f"{pts_str}  {filt_str}", *DIM[:3])
-        if remove_idx >= 0:
-            staging.pop(remove_idx)
-            app._dataset_staging_version = getattr(app, '_dataset_staging_version', 0) + 1
-        imgui.end_child()
-        imgui.pop_style_color(1)
-
-        imgui.push_style_color(imgui.COLOR_BUTTON, 0.05, 0.05, 0.05, 1.0)
-        if imgui.button("Clear staged", width=s(120)):
-            staging.clear()
-            app._dataset_staging_version = getattr(app, '_dataset_staging_version', 0) + 1
-        imgui.pop_style_color(1)
+            imgui.push_style_color(imgui.COLOR_BUTTON, 0.05, 0.05, 0.05, 1.0)
+            if imgui.button("Clear staged", width=s(120)):
+                staging.clear()
+                app._dataset_staging_version = getattr(app, '_dataset_staging_version', 0) + 1
+            imgui.pop_style_color(1)
 
     imgui.spacing()
 
@@ -2863,6 +2906,23 @@ def _draw_train_tab(app):
         train_ok = _path_ok('dir', out_dir)
         if not train_ok:
             btn_color = DIM
+
+        # Pre-launch summary: exactly what this run will train on, read
+        # from the exported dataset's classes.json + scene dirs so it
+        # reflects the data on disk (what training actually consumes),
+        # not the transient UI selection.
+        summary = _dataset_summary_cached(app, out_dir)
+        if summary is not None:
+            n_scenes, n_pts, cls_names = summary
+            imgui.text_colored(
+                f"{n_scenes} scenes   {n_pts:,} pts   "
+                f"{len(cls_names)} classes", *OP1_GRAY[:3])
+            if cls_names:
+                cls_line = ", ".join(cls_names[:6])
+                if len(cls_names) > 6:
+                    cls_line += f", +{len(cls_names) - 6} more"
+                imgui.text_colored(f"  {cls_line}", *DIM[:3])
+
         if _styled_button(btn_label, btn_color, height_units=3.0,
                           fill_alpha=0.15):
             if train_ok:
@@ -2897,6 +2957,16 @@ def _draw_train_tab(app):
                 _launch_inference(app, out_dir,
                                   parent_model=parent_model)
         imgui.spacing()
+
+    # --- BATCH INFERENCE (moved here from Contact Sheets in 1.1) ---
+    # Lives next to the models it uses: model picker, run-on-selected,
+    # run-on-unlabelled. Single-cloud inference is the Light Table's
+    # INFER button.
+    _blue_tint = (OP1_BLUE[0] * 0.10, OP1_BLUE[1] * 0.10,
+                  OP1_BLUE[2] * 0.10, 1.0)
+    if op1_section("BATCH INFERENCE", OP1_BLUE, fill_color=_blue_tint):
+        _draw_inference_section(app)
+    imgui.spacing()
 
     # --- LOG pane (shared CLI) ---
     # The pulse-grid activity banner that used to sit above the LOG
@@ -2940,6 +3010,51 @@ def _draw_train_tab(app):
         cli.execute(cli.input_buf)
         cli.input_buf = ""
         imgui.set_keyboard_focus_here(-1)
+
+
+def _dataset_summary_cached(app, out_dir: str):
+    """(n_scenes, total_points, class_names) for an exported dataset dir.
+
+    Reads classes.json + the train/val/test scene dirs. The scan is
+    cached for 5 seconds per directory so the TRAIN tab never stats the
+    dataset tree on every frame; an export bumps mtime and shows up on
+    the next refresh. Returns None when the dir has no dataset.
+    """
+    cache = getattr(app, '_dataset_summary_cache', None)
+    if cache is None:
+        cache = {}
+        app._dataset_summary_cache = cache
+    now = time.time()
+    hit = cache.get(out_dir)
+    if hit is not None and (now - hit[0]) < 5.0:
+        return hit[1]
+
+    summary = None
+    classes_path = os.path.join(out_dir, "classes.json")
+    if os.path.isfile(classes_path):
+        try:
+            with open(classes_path) as f:
+                meta = json.load(f)
+            cls_names = [n for n in meta.get("class_names", [])
+                         if n.lower() != "unlabeled"]
+            n_scenes = 0
+            n_pts = 0
+            for split in ("train", "val", "test"):
+                split_dir = os.path.join(out_dir, split)
+                if not os.path.isdir(split_dir):
+                    continue
+                for scene in os.listdir(split_dir):
+                    coord = os.path.join(split_dir, scene, "coord.npy")
+                    if os.path.isfile(coord):
+                        n_scenes += 1
+                        # 12 bytes per float32 xyz point — header ~128B.
+                        n_pts += max(0, (os.path.getsize(coord) - 128) // 12)
+            if n_scenes:
+                summary = (n_scenes, int(n_pts), cls_names)
+        except (OSError, json.JSONDecodeError, ValueError):
+            summary = None
+    cache[out_dir] = (now, summary)
+    return summary
 
 
 def _collect_selected_clouds(app) -> list:

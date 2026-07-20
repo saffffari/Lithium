@@ -882,7 +882,8 @@ _section_collapsed: dict[str, bool] = {}
 
 
 def op1_section(text: str, color=OP1_ORANGE, fill_color=None,
-                collapsible: bool = True) -> bool:
+                collapsible: bool = True,
+                default_collapsed: bool = False) -> bool:
     """Section header: title sits inside the panel fill.
 
     Draws a full-width panel strip that continues the fill of the
@@ -915,7 +916,8 @@ def op1_section(text: str, color=OP1_ORANGE, fill_color=None,
     strip_h = th + pad_y * 2
     rounding = _scaled_rounding(PANEL_ROUNDING)
 
-    collapsed = _section_collapsed.get(text, False) if collapsible else False
+    collapsed = (_section_collapsed.get(text, default_collapsed)
+                 if collapsible else False)
 
     strip_fill = fill_color if fill_color is not None else _PANEL_FILL
     corners = (imgui.DRAW_ROUND_CORNERS_TOP if not collapsed
