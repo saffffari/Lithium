@@ -1,0 +1,66 @@
+<svg width="516" height="276" viewBox="0 0 516 276" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g filter="url(#filter0_d_154_2136)">
+<rect x="18" y="9" width="480" height="240" rx="12" fill="#0E0E12"/>
+<path d="M65 210H452" stroke="#3854A5" stroke-width="2"/>
+<path d="M156 204.985H158V210H156V204.985Z" fill="#3854A5"/>
+<path d="M156 197.286H158V202.301H156V197.286Z" fill="#3854A5"/>
+<path d="M156 189.586H158V194.602H156V189.586Z" fill="#3854A5"/>
+<path d="M156 181.887H158V186.902H156V181.887Z" fill="#3854A5"/>
+<path d="M156 174.188H158V179.203H156V174.188Z" fill="#3854A5"/>
+<path d="M156 166.489H158V171.504H156V166.489Z" fill="#3854A5"/>
+<path d="M156 158.789H158V163.805H156V158.789Z" fill="#3854A5"/>
+<path d="M156 151.09H158V156.105H156V151.09Z" fill="#3854A5"/>
+<path d="M156 143.391H158V148.406H156V143.391Z" fill="#3854A5"/>
+<path d="M156 135.692H158V140.707H156V135.692Z" fill="#3854A5"/>
+<path d="M156 127.992H158V133.008H156V127.992Z" fill="#3854A5"/>
+<path d="M156 120.293H158V125.308H156V120.293Z" fill="#3854A5"/>
+<path d="M156 112.594H158V117.609H156V112.594Z" fill="#3854A5"/>
+<path d="M156 104.895H158V109.91H156V104.895Z" fill="#3854A5"/>
+<path d="M156 97.1955H158V102.211H156V97.1955Z" fill="#3854A5"/>
+<path d="M156 89.4962H158V94.5113H156V89.4962Z" fill="#3854A5"/>
+<path d="M156 81.797H158V86.8121H156V81.797Z" fill="#3854A5"/>
+<path d="M156 74.0977H158V79.1129H156V74.0977Z" fill="#3854A5"/>
+<path d="M156 66.3985H158V71.4136H156V66.3985Z" fill="#3854A5"/>
+<path d="M156 58.6992H158V63.7144H156V58.6992Z" fill="#3854A5"/>
+<path d="M156 51H158V56.0151H156V51Z" fill="#3854A5"/>
+<path d="M231 143H229V147.969H231V143Z" fill="#3854A5"/>
+<path d="M229 150.629H231V155.598H229V150.629Z" fill="#3854A5"/>
+<path d="M231 158.258H229V163.227H231V158.258Z" fill="#3854A5"/>
+<path d="M229 165.887H231V170.856H229V165.887Z" fill="#3854A5"/>
+<path d="M231 173.515H229V178.485H231V173.515Z" fill="#3854A5"/>
+<path d="M229 181.144H231V186.113H229V181.144Z" fill="#3854A5"/>
+<path d="M231 188.773H229V193.742H231V188.773Z" fill="#3854A5"/>
+<path d="M229 196.402H231V201.371H229V196.402Z" fill="#3854A5"/>
+<path d="M229 204.031H231V209H229V204.031Z" fill="#3854A5"/>
+<path d="M378 143H376V147.969H378V143Z" fill="#3854A5"/>
+<path d="M376 150.629H378V155.598H376V150.629Z" fill="#3854A5"/>
+<path d="M378 158.258H376V163.227H378V158.258Z" fill="#3854A5"/>
+<path d="M376 165.887H378V170.856H376V165.887Z" fill="#3854A5"/>
+<path d="M378 173.515H376V178.485H378V173.515Z" fill="#3854A5"/>
+<path d="M376 181.144H378V186.113H376V181.144Z" fill="#3854A5"/>
+<path d="M378 188.773H376V193.742H378V188.773Z" fill="#3854A5"/>
+<path d="M376 196.402H378V201.371H376V196.402Z" fill="#3854A5"/>
+<path d="M376 204.031H378V209H376V204.031Z" fill="#3854A5"/>
+<circle cx="64.5" cy="209.5" r="5.5" fill="#638BFF"/>
+<path d="M233 137H378" stroke="#638BFF" stroke-width="2"/>
+<path d="M64 209C65.8162 172.812 86.3588 90.1486 154 49" stroke="#638BFF" stroke-width="2"/>
+<circle cx="452.5" cy="209.5" r="5.5" fill="#638BFF"/>
+<path d="M377 137C380.378 161.333 400.307 210 453 210" stroke="#638BFF" stroke-width="2"/>
+<circle cx="376.5" cy="136.5" r="5.5" fill="#638BFF"/>
+<circle cx="156.5" cy="48.5" r="5.5" fill="#00ED95"/>
+<circle cx="229.5" cy="136.5" r="5.5" fill="#00ED95"/>
+<path d="M156.029 48C155.279 77.6667 169.025 137 230 137" stroke="#00ED95" stroke-width="2"/>
+</g>
+<defs>
+<filter id="filter0_d_154_2136" x="0" y="0" width="516" height="276" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+<feOffset dy="9"/>
+<feGaussianBlur stdDeviation="9"/>
+<feComposite in2="hardAlpha" operator="out"/>
+<feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.3 0"/>
+<feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_154_2136"/>
+<feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_154_2136" result="shape"/>
+</filter>
+</defs>
+</svg>

@@ -1,0 +1,18 @@
+moderngl>=5.12.0
+glfw>=2.10.0
+imgui[glfw]>=2.0.0
+laspy[lazrs]>=2.7.0
+plyfile>=1.1.0
+numpy>=2.0.0
+scipy>=1.14.0
+Pillow>=11.0.0
+pyinstaller>=6.0.0
+
+# Dataset export
+h5py>=3.0.0
+
+
+# GLB model conversion tools (tools/glb_to_ply.py)
+pygltflib>=1.16.0
+DracoPy>=2.0.0
+trimesh>=4.0.0

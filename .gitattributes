@@ -1,0 +1,26 @@
+# Normalize all text to LF in the repo; check out native on each platform.
+# This kills the cross-platform CRLF churn that made every file look modified.
+* text=auto eol=lf
+
+# Windows launchers must stay CRLF to run under cmd.exe.
+*.bat text eol=crlf
+
+# Shell launchers are LF.
+*.sh text eol=lf
+
+# Binary assets — never touch line endings, never diff as text.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.npy binary
+*.npz binary
+*.ply binary
+*.las binary
+*.laz binary
+*.nii binary
+*.nii.gz binary
+*.pt binary
+*.pth binary
+*.ckpt binary
+*.zip binary
