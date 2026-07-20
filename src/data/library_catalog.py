@@ -307,6 +307,25 @@ class LibraryCatalog:
         self._load_index()
         self._load_projects()
 
+        # v2 label layout: upgrade a 1.0 flat labels/ tree to
+        # per-namespace subdirs (idempotent; marker-gated no-op after
+        # the first run). Must happen after _load_projects so each
+        # project's clouds get their own copy of the baseline labels.
+        try:
+            from src.data import cloud_store as _cs
+            mig = _cs.migrate_labels_layout_v2(
+                {pid: list(p.file_keys) for pid, p in self.projects.items()})
+            if mig.get("moved") or mig.get("copied"):
+                print(f"[library] label layout v2 migration: "
+                      f"{mig['moved']} moved, {mig['copied']} copied, "
+                      f"{mig['errors']} errors")
+            if mig.get("errors"):
+                self._init_errors.append(
+                    f"Label layout migration hit {mig['errors']} errors — "
+                    f"see console; flat files were left in place.")
+        except Exception as e:
+            self._init_errors.append(f"Label layout migration failed: {e}")
+
         # CP-4: per-file_key locks initialised last so any failure
         # during _load_index doesn't leave a half-constructed catalog
         # with a populated lock dict.
@@ -818,17 +837,25 @@ class LibraryCatalog:
         self,
         source_project_id: str,
         new_name: str | None = None,
+        include_clouds: bool = True,
     ) -> Project | None:
-        """Create a fresh project with the same labels + settings as another,
-        but an empty ``file_keys`` list.
+        """Create an independent copy of a project.
 
-        Use case: "Apply this trained-and-labelled project's setup to a
-        new batch of clouds." The new project is independent — editing
-        its label registry does not affect the source. Trained-model
-        registry entries are copied by a sibling helper (see
-        ``ProjectModelRegistry.duplicate_from``); checkpoints stay
-        shared on disk so the duplicate inherits the source's
-        inference capability for free.
+        With ``include_clouds=True`` (the 1.1 default) the duplicate
+        carries the source's ontology, settings, cloud membership, AND a
+        verbatim copy of every label file into its own namespace. This
+        is the "retrain with a different class set" workflow: duplicate,
+        edit the new project's ontology (drop / merge / add classes),
+        repaint the deltas, train — the source project is never touched.
+
+        With ``include_clouds=False`` you get the 1.0 behaviour: same
+        ontology + settings, empty ``file_keys`` ("apply this setup to a
+        new batch of clouds").
+
+        Trained-model registry entries are copied by a sibling helper
+        (see ``ProjectModelRegistry.duplicate_from``); checkpoints stay
+        shared on disk so the duplicate inherits the source's inference
+        capability for free.
 
         Returns the new ``Project`` instance, or ``None`` if the source
         project doesn't exist.
@@ -844,11 +871,19 @@ class LibraryCatalog:
             new_name = f"{src.name} (copy)"
         new_proj = self.create_project(new_name)
         # Deep-copy ontology + settings so later edits in either
-        # project don't bleed into the other. file_keys stays empty.
+        # project don't bleed into the other.
         if src.ontology_data is not None:
             new_proj.ontology_data = copy.deepcopy(src.ontology_data)
         if src.settings is not None:
             new_proj.settings = copy.deepcopy(src.settings)
+        if include_clouds and src.file_keys:
+            new_proj.file_keys = list(src.file_keys)
+            try:
+                from src.data import cloud_store as _cs
+                _cs.copy_labels_between_namespaces(
+                    src.file_keys, source_project_id, new_proj.id)
+            except Exception as e:
+                print(f"[duplicate_project] label copy failed: {e}")
         self._save_projects()
         return new_proj
 
@@ -862,6 +897,13 @@ class LibraryCatalog:
                 ProjectModelRegistry(self.dir).drop_project(project_id)
             except Exception as e:
                 print(f"[delete_project] models drop failed: {e}")
+            # v2: the project's label namespace goes with it. Source
+            # clouds and every other project's labels are untouched.
+            try:
+                from src.data import cloud_store as _cs
+                _cs.drop_labels_namespace(project_id)
+            except Exception as e:
+                print(f"[delete_project] namespace drop failed: {e}")
             self._save_projects()
 
     def rename_project(self, project_id: str, name: str) -> None:
@@ -963,22 +1005,24 @@ class LibraryCatalog:
         try:
             from src.data.cloud_store import (
                 drop_cloud, drop_cloud_mesh, drop_preview_labels,
-                cloud_labels_path,
+                cloud_labels_path, label_namespaces,
             )
-            drop_cloud(file_key)           # data + labels
+            drop_cloud(file_key)           # data + labels (all namespaces)
             drop_cloud_mesh(file_key)      # poisson mesh
-            drop_preview_labels(file_key)  # preview-resolution labels
-            # LS-9 recovery sidecar — lives next to canonical labels.
-            recovery_path = cloud_labels_path(file_key).parent / (
-                f"{file_key}.recovery.npy"
-            )
-            try:
-                recovery_path.unlink()
-            except FileNotFoundError:
-                pass
-            except OSError as e:
-                print(f"[remove_entry] recovery sidecar drop failed "
-                      f"for {file_key}: {e}")
+            drop_preview_labels(file_key)  # preview labels (all namespaces)
+            # LS-9 recovery sidecars — live next to canonical labels,
+            # one per namespace in the v2 layout.
+            for ns in label_namespaces():
+                recovery_path = cloud_labels_path(file_key, ns).parent / (
+                    f"{file_key}.recovery.npy"
+                )
+                try:
+                    recovery_path.unlink()
+                except FileNotFoundError:
+                    pass
+                except OSError as e:
+                    print(f"[remove_entry] recovery sidecar drop failed "
+                          f"for {file_key}: {e}")
         except Exception as e:
             print(f"[remove_entry] sidecar drop failed for {file_key}: {e}")
         del self.entries[file_key]

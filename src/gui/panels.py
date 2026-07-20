@@ -1217,32 +1217,36 @@ def _library_row(app, label: str, count: int, color: tuple,
 _SORT_KEYS = ["NAME", "POINTS", "CREATED", "IMPORTED"]
 
 
-def _duplicate_project_with_models(app, source_project_id: str) -> None:
-    """Right-click action: clone a project's labels + model registry
-    into a fresh empty project.
+def _duplicate_project_with_models(app, source_project_id: str,
+                                   include_clouds: bool = True) -> None:
+    """Right-click action: clone a project into an independent copy.
 
-    What we copy:
+    What we copy (1.1 full duplicate):
       - Project metadata (name, ontology_data, settings) — deep copy.
+      - Cloud membership (``file_keys``) plus a verbatim copy of every
+        label file into the duplicate's own namespace — repainting or
+        re-classing the copy never perturbs the source. This is the
+        "retrain with a different class set" entry point.
       - Model registry entries — new model_ids, **same** checkpoint
         paths on disk. Inference in the duplicate uses the source's
         trained .pth files for free.
 
-    What we don't copy:
-      - ``file_keys`` — duplicate starts empty. The user is meant to
-        drop new clouds into it (typically via IMAGING with this
-        project active).
-      - Checkpoint files themselves — those stay where they are. If
-        the source project is later deleted and its training_runs
-        folder cleaned up, the duplicate's references go dangling.
-        The model registry's load-time self-heal covers reachable
-        cases (model_last.pth fallback, work_dir scan).
+    With ``include_clouds=False`` (the "setup only" variant) the
+    duplicate starts with zero clouds — apply this ontology to a new
+    batch.
+
+    Checkpoint files themselves stay where they are. If the source
+    project is later deleted and its training_runs folder cleaned up,
+    the duplicate's references go dangling; the model registry's
+    load-time self-heal covers reachable cases.
 
     Logs the result to the CLI for confirmation.
     """
     catalog = getattr(app, "catalog", None)
     if catalog is None:
         return
-    new_proj = catalog.duplicate_project(source_project_id)
+    new_proj = catalog.duplicate_project(
+        source_project_id, include_clouds=include_clouds)
     if new_proj is None:
         if app.cli:
             app.cli.log(f"Duplicate failed: source project not found.", "error")
@@ -1257,13 +1261,15 @@ def _duplicate_project_with_models(app, source_project_id: str) -> None:
     )
     src_name = catalog.projects[source_project_id].name
     msg = (f"Duplicated '{src_name}' → '{new_proj.name}'  "
-           f"(labels copied, {n_models} model(s) shared, 0 clouds)")
+           f"({len(new_proj.file_keys)} cloud(s) + labels copied, "
+           f"{n_models} model(s) shared)")
     print(f"[duplicate] {msg}")
     if app.cli:
         app.cli.log(msg, "success")
-    # Switch the active view to the new project so the user can drop
-    # clouds straight into it.
-    app.active_view = ("project", new_proj.id)
+    # Switch to the new project through set_active_view — the 1.0 code
+    # assigned app.active_view directly, which left the entry list and
+    # (now) the label namespace pointing at the source project.
+    app.set_active_view(("project", new_proj.id))
 
 
 def _apply_gallery_sort(app):
@@ -3179,6 +3185,24 @@ def _launch_training(app, data_dir: str, model_name: str = "",
         pointcept_ext_dir=pointcept_ext_dir,
     )
 
+    # Freeze the class map at launch: the dataset's classes.json is the
+    # ground truth for what each output channel means. Recording it on
+    # the registry entry (and mirroring it into the run's work_dir)
+    # makes inference class resolution independent of cwd and of later
+    # ontology edits.
+    frozen_class_map: dict[str, str] = {}
+    try:
+        with open(os.path.join(data_dir, "classes.json")) as _cf:
+            _cj = json.load(_cf)
+        for _i, _name in enumerate(_cj.get("class_names", [])):
+            frozen_class_map[str(_i)] = _name
+        if frozen_class_map:
+            with open(os.path.join(work_dir, "classes.json"), "w") as _wf:
+                json.dump(_cj, _wf, indent=2)
+    except (OSError, json.JSONDecodeError, TypeError) as e:
+        if app.cli:
+            app.cli.log(f"classes.json snapshot failed: {e}", "error")
+
     # Create model registry entry before launch
     model_entry = None
     if project_id and app._train_model_registry:
@@ -3194,6 +3218,7 @@ def _launch_training(app, data_dir: str, model_name: str = "",
             num_classes=num_classes,
             work_dir=work_dir,
             config_snapshot=params.to_dict(),
+            class_map=frozen_class_map,
             parent_model_id=parent_model.model_id if parent_model else "",
         )
         app._train_model_registry.add_model(project_id, model_entry)
@@ -3741,18 +3766,28 @@ def _resolve_inference_model(app, project_id: str | None):
 
     Selection order:
     1. User-selected pick on ``app._inference_selector_picks[project_id]``
-       — set by the SHEETS-tab model dropdown so the user can A/B
-       between checkpoints without round-tripping through the registry
-       file. ``None`` in the dict means "auto" (explicit clear).
+       — set by the model dropdown so the user can A/B between
+       checkpoints. ``None`` in the dict means "auto" (explicit clear).
+       Persisted in the project's settings (``active_model_id``) so the
+       pick survives restarts and project switches (1.1).
     2. Highest-mIoU eligible model in the registry (auto default).
     """
     eligibles = _inference_eligible_models(app, project_id)
     if not eligibles:
         return None
     picks = getattr(app, "_inference_selector_picks", None)
-    if (isinstance(picks, dict) and project_id in picks
-            and picks[project_id] is not None):
+    pick_id = None
+    if isinstance(picks, dict) and project_id in picks:
         pick_id = picks[project_id]
+    else:
+        # Restore a persisted pick from project settings on first touch.
+        catalog = getattr(app, 'catalog', None)
+        proj = catalog.projects.get(project_id) if catalog else None
+        if proj is not None and isinstance(proj.settings, dict):
+            pick_id = proj.settings.get("active_model_id") or None
+            if isinstance(picks, dict):
+                picks[project_id] = pick_id
+    if pick_id is not None:
         for m in eligibles:
             if m.model_id == pick_id:
                 return m
@@ -3816,6 +3851,14 @@ def _draw_inference_model_picker(app) -> None:
     imgui.pop_item_width()
     if changed and 0 <= new_idx < len(item_model_ids):
         picks_dict[project_id] = item_model_ids[new_idx]
+        # Persist the pick on the project so it survives restarts.
+        catalog = getattr(app, 'catalog', None)
+        proj = catalog.projects.get(project_id) if catalog else None
+        if proj is not None:
+            if not isinstance(proj.settings, dict):
+                proj.settings = {}
+            proj.settings["active_model_id"] = item_model_ids[new_idx]
+            catalog._save_projects()
 
     # Show the checkpoint basename that RUN INFERENCE would actually
     # use right now — disambiguates "(auto)" by naming the winner.
@@ -3893,6 +3936,9 @@ def _resolve_inference_class_map(
     crashes ``load_state_dict`` when the lengths disagree).
 
     Resolution order:
+      0. The registry model whose checkpoint this is — its ``class_map``
+         was frozen at launch time (1.1). Fully immune to moved files
+         and later ontology edits.
       1. ``classes.json`` co-located with the checkpoint (walks up from
          the checkpoint dir). This is the training-time file and the
          only one guaranteed to line up with the checkpoint's seg_head.
@@ -3910,8 +3956,24 @@ def _resolve_inference_class_map(
 
     classes_name_order: list[str] = []
 
+    # 0. Frozen class_map on the registry entry that owns this checkpoint.
+    if checkpoint_path and getattr(app, '_train_model_registry', None):
+        project_id = _resolve_active_project_id(app)
+        if project_id:
+            for m in app._train_model_registry.list_models(project_id):
+                if (m.class_map
+                        and checkpoint_path in (m.best_checkpoint,
+                                                m.last_checkpoint)):
+                    try:
+                        ordered = sorted(m.class_map.items(),
+                                         key=lambda kv: int(kv[0]))
+                        classes_name_order = [name for _k, name in ordered]
+                    except (ValueError, TypeError):
+                        classes_name_order = []
+                    break
+
     # 1. Co-located with the checkpoint — authoritative.
-    if checkpoint_path:
+    if not classes_name_order and checkpoint_path:
         cj = _find_classes_json_for_checkpoint(checkpoint_path)
         if cj:
             try:
@@ -3955,6 +4017,7 @@ def _resolve_inference_class_map(
 def _predict_cloud(
     app, entry, *, checkpoint: str, python_exe: str,
     class_names: list[str], cls_to_rid,
+    label_namespace: str | None = None,
 ) -> "np.ndarray | None":
     """Run inference on a single entry and return mapped registry-id labels.
 
@@ -3969,6 +4032,11 @@ def _predict_cloud(
 
     Returns None on any failure (subprocess error, length mismatch, missing
     GPU buffer, etc.) and logs to ``app.cli`` / stdout for diagnosis.
+
+    ``label_namespace`` pins the disk writes to the project namespace
+    captured at submit time — this function runs on worker threads, so
+    relying on the process-global active namespace would misroute the
+    save if the user switches projects mid-batch.
     """
     import subprocess as _sp
     import tempfile
@@ -4103,7 +4171,8 @@ def _predict_cloud(
         if file_key and len(new_labels) == cloud.point_count:
             try:
                 from src.data import cloud_store as _cs
-                prior = _cs.load_cloud_labels(file_key)
+                prior = _cs.load_cloud_labels(
+                    file_key, namespace=label_namespace)
                 if prior is not None and prior.size == new_labels.size:
                     import time as _time
                     from pathlib import Path as _Path
@@ -4124,7 +4193,8 @@ def _predict_cloud(
                 # of the high-impact destructive writes.
                 err = save_cloud_labels(
                     file_key, new_labels,
-                    catalog=getattr(app, 'catalog', None))
+                    catalog=getattr(app, 'catalog', None),
+                    namespace=label_namespace)
                 if err:
                     print(f"[infer] {entry.name}: {err}")
                     try:
@@ -4256,6 +4326,10 @@ class _BatchInferenceRunner:
         self.python_exe = python_exe
         self.class_names = class_names
         self.cls_to_rid = cls_to_rid
+        # v2: freeze the label namespace at submit so a mid-batch
+        # project switch can't misroute the worker's disk writes.
+        from src.data import cloud_store as _cs
+        self.label_namespace = _cs.active_label_namespace()
         self.running = False
         self.cancelled = False
         self.current: tuple[int, int, str] | None = None
@@ -4286,6 +4360,7 @@ class _BatchInferenceRunner:
                     python_exe=self.python_exe,
                     class_names=self.class_names,
                     cls_to_rid=self.cls_to_rid,
+                    label_namespace=self.label_namespace,
                 )
                 if new_labels is None:
                     self.failed += 1

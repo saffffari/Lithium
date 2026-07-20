@@ -42,6 +42,14 @@ class TrainedModel:
     # Config frozen at launch time
     config_snapshot: dict = field(default_factory=dict)
 
+    # Class map frozen at launch: {str(label_id): name}, in training
+    # class order. This is the authoritative record of what the model's
+    # output channels mean — inference reads it from here first, so a
+    # moved checkpoint or a changed project ontology can't silently
+    # mis-map predictions (1.0 resolved classes through a fragile
+    # cwd-relative classes.json fallback chain).
+    class_map: dict = field(default_factory=dict)
+
     # Fine-tune lineage
     parent_model_id: str = ""       # empty for from-scratch, model_id for fine-tune
 
@@ -243,13 +251,71 @@ class ProjectModelRegistry:
         models = self.load(project_id)
         return sorted(models, key=lambda m: m.created, reverse=True)
 
-    def delete_model(self, project_id: str, model_id: str):
-        """Remove a model entry (does NOT delete files on disk)."""
+    def delete_model(self, project_id: str, model_id: str,
+                     delete_artifacts: bool = False) -> int:
+        """Remove a model entry; optionally delete its run directory.
+
+        With ``delete_artifacts=True`` the model's ``work_dir``
+        (checkpoints, logs, config) is removed from disk — UNLESS any
+        other registry entry in ANY cached/persisted project still
+        references the same ``work_dir`` (duplicated projects share
+        checkpoints by reference). Returns the number of bytes freed
+        (0 when artifacts were kept).
+        """
         models = self.load(project_id)
+        target = next((m for m in models if m.model_id == model_id), None)
         self._cache[project_id] = [
             m for m in models if m.model_id != model_id
         ]
         self.save(project_id)
+        if not (delete_artifacts and target is not None and target.work_dir):
+            return 0
+        if self._work_dir_referenced(target.work_dir):
+            print(f"[model_registry] keeping {target.work_dir} — "
+                  f"referenced by another model entry")
+            return 0
+        freed = self.artifact_size(target.work_dir)
+        try:
+            import shutil
+            shutil.rmtree(target.work_dir)
+        except OSError as e:
+            print(f"[model_registry] artifact delete failed: {e}")
+            return 0
+        return freed
+
+    def _work_dir_referenced(self, work_dir: str) -> bool:
+        """True if any model entry across ALL projects references work_dir."""
+        try:
+            project_ids = [os.path.splitext(f)[0] for f in
+                           os.listdir(self.models_dir) if f.endswith(".json")]
+        except OSError:
+            project_ids = list(self._cache.keys())
+        for fname in project_ids:
+            path = os.path.join(self.models_dir, f"{fname}.json")
+            try:
+                with open(path) as f:
+                    data = json.load(f)
+            except (OSError, json.JSONDecodeError):
+                continue
+            for entry in data:
+                if entry.get("work_dir") == work_dir:
+                    return True
+        return False
+
+    @staticmethod
+    def artifact_size(work_dir: str) -> int:
+        """Total bytes under a model's run directory (0 if missing)."""
+        total = 0
+        try:
+            for root, _dirs, files in os.walk(work_dir):
+                for f in files:
+                    try:
+                        total += os.path.getsize(os.path.join(root, f))
+                    except OSError:
+                        pass
+        except OSError:
+            pass
+        return total
 
     def duplicate_from(self, source_project_id: str,
                        dest_project_id: str) -> int:

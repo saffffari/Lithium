@@ -1713,6 +1713,20 @@ class App:
         else:
             target_entries = []
 
+        # v2 label namespaces: point every subsequent label read/write
+        # at the incoming project's namespace (smart views and folders
+        # use the shared _library baseline). Must happen before any
+        # entry construction — the lazy load paths below and in
+        # _render_gallery read labels through the active namespace.
+        # Outgoing labels need no flush here: every stroke is
+        # saved-through at paint time under the then-active namespace.
+        from src.data import cloud_store as _cs
+        if view is not None and view[0] == "project" \
+                and view[1] in self.catalog.projects:
+            _cs.set_active_label_namespace(view[1])
+        else:
+            _cs.set_active_label_namespace(None)
+
         # Release GPU resources for the outgoing session
         for e in self.entries:
             e.release()

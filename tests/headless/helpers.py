@@ -49,17 +49,38 @@ def make_companion_label_npy(ply_path: str, labels: np.ndarray) -> str:
 
 
 def count_label_files_on_disk(library_dir: str) -> int:
-    """Number of non-tmp ``.npy`` files in ``<library_dir>/labels/``."""
+    """Number of non-tmp ``.npy`` files under ``<library_dir>/labels/``.
+
+    v2 layout: labels live in per-namespace subdirs; the flat top level
+    is also counted so unmigrated fixtures still register.
+    """
     labels_dir = Path(library_dir) / "labels"
     if not labels_dir.exists():
         return 0
-    return sum(
-        1 for p in labels_dir.iterdir()
-        if p.is_file() and p.suffix == ".npy"
-        and not p.name.startswith("_tmp_")
-    )
+
+    def _count(d: Path) -> int:
+        return sum(
+            1 for p in d.iterdir()
+            if p.is_file() and p.suffix == ".npy"
+            and not p.name.startswith("_tmp_")
+        )
+
+    total = _count(labels_dir)
+    for sub in labels_dir.iterdir():
+        if sub.is_dir():
+            total += _count(sub)
+    return total
 
 
-def labels_npy_path(library_dir: str, file_key: str) -> Path:
-    """Compute the catalog labels file path for ``file_key``."""
-    return Path(library_dir) / "labels" / f"{file_key}.npy"
+def labels_npy_path(library_dir: str, file_key: str,
+                    namespace: str | None = None) -> Path:
+    """Compute the catalog labels file path for ``file_key`` (v2 layout).
+
+    Defaults to the process-active namespace so tests that never touch
+    projects resolve to ``labels/_library/``.
+    """
+    from src.data import cloud_store
+    ns = cloud_store.sanitize_namespace(
+        namespace if namespace is not None
+        else cloud_store.active_label_namespace())
+    return Path(library_dir) / "labels" / ns / f"{file_key}.npy"

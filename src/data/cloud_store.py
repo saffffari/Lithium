@@ -11,12 +11,25 @@ the catalog. This means:
 - Any future model can be trained directly off the catalog directory
   without an explicit ``EXPORT`` step (the catalog *is* the export).
 
-Layout:
+Layout (v2 — 1.1):
 
     ~/.3photon/library/
-    ├── data/<file_key>.npz       coord + color + scalars  (write-once on import)
-    ├── labels/<file_key>.npy     int32 per-point labels   (rewritten on every stroke)
-    └── previews/<file_key>.npz   gallery thumbnail        (existing — separate)
+    ├── data/<file_key>.npz              coord + color + scalars (write-once on import)
+    ├── labels/<namespace>/<file_key>.npy         int32 per-point labels
+    ├── preview_labels/<namespace>/<file_key>.npy downsampled labels
+    └── previews/<file_key>.npz          gallery thumbnail (namespace-free)
+
+``namespace`` is the label namespace: a project id (``proj:<uuid>``,
+sanitized for the filesystem) or the reserved ``_library`` namespace for
+clouds viewed outside any project (session / folder / smart views).
+A cloud that belongs to N projects has up to N independent label
+arrays — painting in one project never perturbs another. Files are
+created lazily: a missing per-namespace file means "all unlabeled".
+
+The 1.0 layout kept a single flat ``labels/<file_key>.npy`` shared by
+every project (destructively remapped on project switch — the root
+cause of cross-project label corruption). ``migrate_labels_layout_v2``
+upgrades a v1 library in place on first run.
 
 The data file carries metadata (source path, source mtime at import
 time, scalar key list) so we can detect a stale source on reload and
@@ -63,8 +76,46 @@ def _data_dir() -> Path:
     return p
 
 
-def _labels_dir() -> Path:
-    p = Path(library_paths.library_dir()) / _LABELS_SUBDIR
+# ---------------------------------------------------------------------------
+# Label namespaces (v2)
+# ---------------------------------------------------------------------------
+
+# Reserved namespace for clouds viewed outside any project (session /
+# folder / smart views). Also receives the flat v1 label files on
+# migration, preserving them as the pre-project baseline.
+LIBRARY_NAMESPACE = "_library"
+
+# The active namespace is process-global UI state: App.set_active_view
+# points it at the current project. Background workers MUST NOT rely on
+# it — they capture the namespace at submit time and pass it explicitly,
+# otherwise a mid-job project switch would misroute their writes.
+_active_namespace: str = LIBRARY_NAMESPACE
+
+
+def sanitize_namespace(namespace: str) -> str:
+    """Filesystem-safe form of a namespace (project ids contain ':')."""
+    safe = "".join(c if (c.isalnum() or c in "-_") else "_" for c in namespace)
+    return safe or LIBRARY_NAMESPACE
+
+
+def set_active_label_namespace(namespace: str | None) -> None:
+    """Point label reads/writes at a project's namespace (None = library)."""
+    global _active_namespace
+    _active_namespace = namespace or LIBRARY_NAMESPACE
+
+
+def active_label_namespace() -> str:
+    return _active_namespace
+
+
+def _resolve_ns(namespace: str | None) -> str:
+    return sanitize_namespace(namespace if namespace is not None
+                              else _active_namespace)
+
+
+def _labels_dir(namespace: str | None = None) -> Path:
+    p = (Path(library_paths.library_dir()) / _LABELS_SUBDIR
+         / _resolve_ns(namespace))
     p.mkdir(parents=True, exist_ok=True)
     return p
 
@@ -79,8 +130,8 @@ def cloud_data_path(file_key: str) -> Path:
     return _data_dir() / f"{file_key}.npz"
 
 
-def cloud_labels_path(file_key: str) -> Path:
-    return _labels_dir() / f"{file_key}.npy"
+def cloud_labels_path(file_key: str, namespace: str | None = None) -> Path:
+    return _labels_dir(namespace) / f"{file_key}.npy"
 
 
 def cloud_mesh_path(file_key: str) -> Path:
@@ -91,8 +142,34 @@ def has_cloud_data(file_key: str) -> bool:
     return cloud_data_path(file_key).exists()
 
 
-def has_cloud_labels(file_key: str) -> bool:
-    return cloud_labels_path(file_key).exists()
+def has_cloud_labels(file_key: str, namespace: str | None = None) -> bool:
+    return cloud_labels_path(file_key, namespace).exists()
+
+
+def has_cloud_labels_any_namespace(file_key: str) -> bool:
+    """True if ANY namespace holds a labels file for ``file_key``."""
+    root = Path(library_paths.library_dir()) / _LABELS_SUBDIR
+    if not root.exists():
+        return False
+    try:
+        for ns_dir in root.iterdir():
+            if ns_dir.is_dir() and (ns_dir / f"{file_key}.npy").exists():
+                return True
+        # Unmigrated v1 flat file counts too.
+        return (root / f"{file_key}.npy").exists()
+    except OSError:
+        return False
+
+
+def label_namespaces() -> list[str]:
+    """All namespaces that currently exist on disk."""
+    root = Path(library_paths.library_dir()) / _LABELS_SUBDIR
+    if not root.exists():
+        return []
+    try:
+        return sorted(p.name for p in root.iterdir() if p.is_dir())
+    except OSError:
+        return []
 
 
 def has_cloud_mesh(file_key: str) -> bool:
@@ -329,7 +406,7 @@ def load_cloud_data(
 # ---------------------------------------------------------------------------
 
 def save_cloud_labels(file_key: str, labels: np.ndarray,
-                      catalog=None) -> str | None:
+                      catalog=None, namespace: str | None = None) -> str | None:
     """Atomically persist a cloud's int32 label array to the catalog.
 
     Returns ``None`` on success, or a human-readable error string on
@@ -344,12 +421,17 @@ def save_cloud_labels(file_key: str, labels: np.ndarray,
     DIFFERENT keys still run in parallel (the typical batch case).
     Pass ``catalog=None`` to skip locking (single-threaded contexts:
     CLI batch tools, headless tests).
+
+    ``namespace`` routes the write to a specific label namespace
+    (project id). None = the active namespace. Background workers must
+    pass the namespace they captured at submit time.
     """
     if not file_key or labels is None or labels.size == 0:
         return None
+    ns = _resolve_ns(namespace)
 
     def _do_write() -> str | None:
-        target = cloud_labels_path(file_key)
+        target = cloud_labels_path(file_key, ns)
         tmp_base = target.parent / f"_tmp_{target.stem}"
         tmp_with_npy = tmp_base.with_suffix(".npy")
         try:
@@ -378,20 +460,24 @@ def save_cloud_labels(file_key: str, labels: np.ndarray,
     return _do_write()
 
 
-def snapshot_labels(file_keys: list[str]) -> tuple[Path, int, int]:
+def snapshot_labels(file_keys: list[str],
+                    namespace: str | None = None) -> tuple[Path, int, int]:
     """Copy each cloud's catalog labels file to a timestamped backup dir.
 
     Used by File > Save Points so the user has a manual recovery point
     they can roll back to. Backups live at
-    ``<catalog>/backups/<YYYY-MM-DD_HH-MM-SS>/<file_key>.npy`` so the
-    layout mirrors the live catalog and ``copy back`` is a plain file
-    copy.
+    ``<catalog>/backups/<YYYY-MM-DD_HH-MM-SS>/<namespace>/<file_key>.npy``
+    so the layout mirrors the live catalog and ``copy back`` is a plain
+    file copy.
+
+    Snapshots the given namespace (active by default).
 
     Returns ``(backup_dir, copied, skipped)``. Skipped count includes
     file_keys with no live labels file and any per-file copy failure.
     """
+    ns = _resolve_ns(namespace)
     timestamp = time.strftime("%Y-%m-%d_%H-%M-%S")
-    backup_dir = Path(library_paths.library_dir()) / "backups" / timestamp
+    backup_dir = Path(library_paths.library_dir()) / "backups" / timestamp / ns
     backup_dir.mkdir(parents=True, exist_ok=True)
     copied = 0
     skipped = 0
@@ -399,7 +485,7 @@ def snapshot_labels(file_keys: list[str]) -> tuple[Path, int, int]:
         if not fk:
             skipped += 1
             continue
-        src = cloud_labels_path(fk)
+        src = cloud_labels_path(fk, ns)
         if not src.exists():
             skipped += 1
             continue
@@ -447,17 +533,19 @@ def prune_old_snapshots(keep_last: int) -> int:
 _PREVIEW_LABELS_SUBDIR = "preview_labels"
 
 
-def _preview_labels_dir() -> Path:
-    p = Path(library_paths.library_dir()) / _PREVIEW_LABELS_SUBDIR
+def _preview_labels_dir(namespace: str | None = None) -> Path:
+    p = (Path(library_paths.library_dir()) / _PREVIEW_LABELS_SUBDIR
+         / _resolve_ns(namespace))
     p.mkdir(parents=True, exist_ok=True)
     return p
 
 
-def preview_labels_path(file_key: str) -> Path:
-    return _preview_labels_dir() / f"{file_key}.npy"
+def preview_labels_path(file_key: str, namespace: str | None = None) -> Path:
+    return _preview_labels_dir(namespace) / f"{file_key}.npy"
 
 
-def save_preview_labels(file_key: str, labels: np.ndarray) -> None:
+def save_preview_labels(file_key: str, labels: np.ndarray,
+                        namespace: str | None = None) -> None:
     """Persist preview-resolution labels alongside the full ones.
 
     The catalog ``labels/<file_key>.npy`` file holds FULL-resolution
@@ -470,7 +558,7 @@ def save_preview_labels(file_key: str, labels: np.ndarray) -> None:
     """
     if not file_key or labels is None or labels.size == 0:
         return
-    target = preview_labels_path(file_key)
+    target = preview_labels_path(file_key, namespace)
     tmp_base = target.parent / f"_tmp_{target.stem}"
     tmp_with_npy = tmp_base.with_suffix(".npy")
     try:
@@ -487,7 +575,8 @@ def save_preview_labels(file_key: str, labels: np.ndarray) -> None:
 
 
 def load_preview_labels(file_key: str,
-                        expect_count: int | None = None) -> np.ndarray | None:
+                        expect_count: int | None = None,
+                        namespace: str | None = None) -> np.ndarray | None:
     """Return the persisted preview-resolution labels for ``file_key`` or None.
 
     When ``expect_count`` is provided, the loaded array's length is
@@ -496,7 +585,7 @@ def load_preview_labels(file_key: str,
     silently broadcast or truncate. Pass the preview's
     ``point_count`` whenever it's known.
     """
-    path = preview_labels_path(file_key)
+    path = preview_labels_path(file_key, namespace)
     if not path.exists():
         return None
     try:
@@ -512,9 +601,10 @@ def load_preview_labels(file_key: str,
     return arr
 
 
-def load_cloud_labels(file_key: str) -> np.ndarray | None:
+def load_cloud_labels(file_key: str,
+                      namespace: str | None = None) -> np.ndarray | None:
     """Return the saved int32 label array for ``file_key`` or None."""
-    path = cloud_labels_path(file_key)
+    path = cloud_labels_path(file_key, namespace)
     if not path.exists():
         return None
     try:
@@ -607,119 +697,240 @@ def migrate_cloud_labels_to_project(
     file_keys: list[str],
     source_registry,
     dest_project,
+    source_namespace: str | None = None,
 ) -> dict:
-    """Carry a cloud's painted labels into a destination project's ontology.
+    """Copy a cloud's painted labels into a destination project's namespace.
 
-    Labels are stored per-cloud at ``labels/<file_key>.npy`` as raw int
-    IDs that only have meaning under whatever registry was active when
-    the paint happened (the source registry — typically ``app.label_registry``
-    for the currently active view). When the same cloud is added to a
-    different project, those IDs may collide with the destination's
-    registry (e.g. id=3 means "Spinous Process" in source, "Pedicle" in
-    dest). This helper resolves that:
+    v2 semantics: the SOURCE namespace is never modified. For each cloud
+    we read its labels from ``source_namespace`` (active namespace by
+    default), translate ids by label NAME into the destination project's
+    ontology, and write the translated copy into the destination
+    project's own namespace (``labels/<dest_project.id>/``). Projects
+    that already share this cloud keep their labels untouched — this is
+    the fix for 1.0's destructive in-place remap.
 
-    For each cloud:
-      1. Read its labels file.
-      2. For each unique non-zero source id present, look up the source
-         registry's name. Then look that name up in the destination
-         project's registry:
-           - found  → reuse the destination's existing id (the painted
-             points join that layer)
-           - missing → add a new label to the destination registry with
-             the source's name + color, and use that new id
-      3. Rewrite the cloud's labels file with the destination ids.
-      4. Mirror the same remap on the preview labels file when present
-         so the gallery/contact-sheet thumbnails stay accurate.
+    Name resolution per unique non-zero source id:
+      - name found in destination ontology  → reuse that id
+      - name missing → add a new label to the destination registry with
+        the source's name + color, and use the new id
+      - id unknown to the source registry → carried over verbatim
 
-    If ``dest_project`` has no ontology yet, ``source_registry`` is
-    cloned wholesale as the destination's ontology — no per-cloud
-    remap is needed in that case (the cloud's existing ids stay valid).
+    If ``dest_project`` has no ontology yet, the source registry is
+    cloned wholesale as the destination's ontology and the label files
+    are copied without translation (ids are already valid).
+
+    Existing label files in the destination namespace are NOT
+    overwritten — a project's own paint always wins over a re-import.
 
     The destination project's ``ontology_data`` is updated in-place.
     The caller is responsible for persisting projects.json (typically
     via ``LibraryCatalog.add_to_project``, which calls ``_save_projects``).
 
-    Returns ``{"clouds_remapped": int, "labels_added": int}``.
+    Returns ``{"clouds_copied": int, "labels_added": int}``
+    (``clouds_remapped`` is kept as an alias for older callers).
     """
     # Late imports — cloud_store is otherwise free of label/registry deps
-    # and several tests monkey-patch label_catalog.library_dir without
+    # and several tests monkey-patch library_paths.library_dir without
     # ever touching LabelRegistry.
     from src.data.labels import LabelRegistry
 
-    summary = {"clouds_remapped": 0, "labels_added": 0}
+    summary = {"clouds_copied": 0, "labels_added": 0, "clouds_remapped": 0}
     if not file_keys or source_registry is None or dest_project is None:
         return summary
 
-    # Fast path: destination project has no ontology. Adopt the source
-    # registry as-is so the cloud's existing ids stay valid; no per-cloud
-    # rewrites needed.
-    if dest_project.ontology_data is None:
-        dest_project.ontology_data = source_registry.to_json()
-        return summary
+    src_ns = _resolve_ns(source_namespace)
+    dest_ns = sanitize_namespace(dest_project.id)
+    if src_ns == dest_ns:
+        return summary  # nothing to do — already this project's labels
 
-    dest_registry = LabelRegistry.from_json(dest_project.ontology_data)
-    name_to_dest_id = {info.name: info.id for info in dest_registry.all_labels()}
+    adopt_wholesale = dest_project.ontology_data is None
+    if adopt_wholesale:
+        dest_project.ontology_data = source_registry.to_json()
+        dest_registry = None
+        name_to_dest_id = {}
+    else:
+        dest_registry = LabelRegistry.from_json(dest_project.ontology_data)
+        name_to_dest_id = {info.name: info.id
+                           for info in dest_registry.all_labels()}
 
     for fk in file_keys:
-        labels = load_cloud_labels(fk)
+        if has_cloud_labels(fk, dest_ns):
+            continue  # never clobber the destination project's own paint
+        labels = load_cloud_labels(fk, src_ns)
         if labels is None or labels.size == 0:
             continue
         unique_ids = np.unique(labels)
         non_zero = unique_ids[unique_ids != 0]
         if non_zero.size == 0:
-            continue  # nothing painted, nothing to migrate
+            continue  # nothing painted, nothing to copy
 
-        remap: dict[int, int] = {0: 0}
-        any_remapped = False
-        for src_id in non_zero:
-            src_id_i = int(src_id)
-            src_info = source_registry.get(src_id_i)
-            if src_info is None:
-                # The cloud carries an id we can't name. Leave it as-is
-                # rather than guessing — the user can sort it out manually.
-                remap[src_id_i] = src_id_i
-                continue
-            dest_id = name_to_dest_id.get(src_info.name)
-            if dest_id is None:
-                try:
-                    dest_id = dest_registry.add_label(
-                        name=src_info.name, color=src_info.color)
-                except ValueError as e:
-                    # Hit MAX_LABELS or similar — preserve the source id
-                    # so points aren't silently relabelled to 0.
-                    print(f"migrate: add_label({src_info.name}) failed: {e}")
-                    remap[src_id_i] = src_id_i
+        if adopt_wholesale:
+            remap: dict[int, int] = {}
+        else:
+            remap = {}
+            for src_id in non_zero:
+                src_id_i = int(src_id)
+                src_info = source_registry.get(src_id_i)
+                if src_info is None:
+                    # The cloud carries an id we can't name. Carry it over
+                    # verbatim rather than guessing — the user can sort it
+                    # out manually.
                     continue
-                name_to_dest_id[src_info.name] = dest_id
-                summary["labels_added"] += 1
-            remap[src_id_i] = dest_id
-            if dest_id != src_id_i:
-                any_remapped = True
+                dest_id = name_to_dest_id.get(src_info.name)
+                if dest_id is None:
+                    try:
+                        dest_id = dest_registry.add_label(
+                            name=src_info.name, color=src_info.color)
+                    except ValueError as e:
+                        # Hit MAX_LABELS or similar — preserve the source id
+                        # so points aren't silently relabelled to 0.
+                        print(f"migrate: add_label({src_info.name}) failed: {e}")
+                        continue
+                    name_to_dest_id[src_info.name] = dest_id
+                    summary["labels_added"] += 1
+                if dest_id != src_id_i:
+                    remap[src_id_i] = dest_id
 
-        if not any_remapped:
-            continue
-
-        # Apply remap to the full-resolution labels and preview labels.
         new_labels = labels.copy()
         for src_id_i, dest_id in remap.items():
-            if src_id_i != dest_id:
-                new_labels[labels == src_id_i] = dest_id
-        save_cloud_labels(fk, new_labels)
+            new_labels[labels == src_id_i] = dest_id
+        save_cloud_labels(fk, new_labels, namespace=dest_ns)
 
-        prev = load_preview_labels(fk)
+        prev = load_preview_labels(fk, namespace=src_ns)
         if prev is not None:
             new_prev = prev.copy()
             for src_id_i, dest_id in remap.items():
-                if src_id_i != dest_id:
-                    new_prev[prev == src_id_i] = dest_id
-            save_preview_labels(fk, new_prev)
+                new_prev[prev == src_id_i] = dest_id
+            save_preview_labels(fk, new_prev, namespace=dest_ns)
 
-        summary["clouds_remapped"] += 1
+        summary["clouds_copied"] += 1
 
+    summary["clouds_remapped"] = summary["clouds_copied"]
     # Persist the (possibly extended) destination ontology back onto the
     # project. Caller still needs to flush projects.json via the catalog.
-    dest_project.ontology_data = dest_registry.to_json()
+    if dest_registry is not None:
+        dest_project.ontology_data = dest_registry.to_json()
     return summary
+
+
+def copy_labels_between_namespaces(
+    file_keys: list[str],
+    source_namespace: str,
+    dest_namespace: str,
+    overwrite: bool = False,
+) -> int:
+    """Verbatim-copy label + preview-label files between namespaces.
+
+    Used by project duplication, where source and destination share an
+    identical ontology at copy time so no id translation is needed.
+    Returns the number of full-resolution label files copied.
+    """
+    src_ns = sanitize_namespace(source_namespace)
+    dest_ns = sanitize_namespace(dest_namespace)
+    if src_ns == dest_ns:
+        return 0
+    copied = 0
+    for fk in file_keys:
+        for path_fn in (cloud_labels_path, preview_labels_path):
+            src = path_fn(fk, src_ns)
+            if not src.exists():
+                continue
+            dest = path_fn(fk, dest_ns)
+            if dest.exists() and not overwrite:
+                continue
+            try:
+                shutil.copy2(src, dest)
+                if path_fn is cloud_labels_path:
+                    copied += 1
+            except OSError as e:
+                print(f"namespace copy failed for {fk}: {e}")
+    return copied
+
+
+# ---------------------------------------------------------------------------
+# v1 → v2 label-layout migration
+# ---------------------------------------------------------------------------
+
+_V2_MARKER = ".v2-migrated"
+
+
+def labels_layout_is_v2() -> bool:
+    root = Path(library_paths.library_dir()) / _LABELS_SUBDIR
+    return (root / _V2_MARKER).exists()
+
+
+def migrate_labels_layout_v2(project_file_keys: dict[str, list[str]]) -> dict:
+    """Upgrade a 1.0 flat label layout to per-namespace (idempotent).
+
+    ``project_file_keys`` maps project id → the file_keys it contains
+    (from projects.json). Steps, per label root (``labels/`` and
+    ``preview_labels/``):
+
+      1. Every flat ``<file_key>.npy`` is MOVED to ``_library/`` — the
+         pre-project baseline namespace.
+      2. For every project containing that cloud, the baseline file is
+         COPIED into ``<project_id>/``. 1.0 kept the ids remapped to the
+         last-active ontology, so a straight copy is the most faithful
+         starting point for every project.
+      3. A ``.v2-migrated`` marker gates re-runs.
+
+    Never deletes label data: flat files are moved, not discarded, and
+    copies are skipped when the destination already exists. Safe to call
+    on every startup; a marked library returns immediately.
+    """
+    result = {"moved": 0, "copied": 0, "errors": 0}
+    lib_dir = Path(library_paths.library_dir())
+    labels_root = lib_dir / _LABELS_SUBDIR
+    marker = labels_root / _V2_MARKER
+    if marker.exists():
+        return result
+
+    for root in (labels_root, lib_dir / _PREVIEW_LABELS_SUBDIR):
+        root.mkdir(parents=True, exist_ok=True)
+        baseline = root / LIBRARY_NAMESPACE
+        baseline.mkdir(parents=True, exist_ok=True)
+        try:
+            flat_files = [p for p in root.iterdir()
+                          if p.is_file() and p.suffix == ".npy"
+                          and not p.name.startswith("_tmp_")]
+        except OSError:
+            result["errors"] += 1
+            continue
+        for src in flat_files:
+            fk = src.stem
+            dest = baseline / src.name
+            try:
+                if dest.exists():
+                    src.unlink()  # baseline already has it (crash re-run)
+                else:
+                    os.replace(src, dest)
+                result["moved"] += 1
+            except OSError as e:
+                print(f"labels v2 migration: move {src.name} failed: {e}")
+                result["errors"] += 1
+                continue
+            for pid, fks in project_file_keys.items():
+                if fk not in fks:
+                    continue
+                proj_dir = root / sanitize_namespace(pid)
+                proj_dir.mkdir(parents=True, exist_ok=True)
+                proj_dest = proj_dir / src.name
+                if proj_dest.exists():
+                    continue
+                try:
+                    shutil.copy2(dest, proj_dest)
+                    result["copied"] += 1
+                except OSError as e:
+                    print(f"labels v2 migration: copy {src.name} -> "
+                          f"{pid} failed: {e}")
+                    result["errors"] += 1
+
+    if result["errors"] == 0:
+        try:
+            marker.touch()
+        except OSError:
+            pass
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -749,8 +960,41 @@ def is_source_stale(meta: dict, source_path: str | None) -> bool:
 # ---------------------------------------------------------------------------
 
 def drop_cloud(file_key: str) -> None:
-    """Remove both data and labels for ``file_key``. Silent on missing files."""
-    for p in (cloud_data_path(file_key), cloud_labels_path(file_key)):
+    """Remove data and labels (across ALL namespaces) for ``file_key``.
+
+    Called when a cloud leaves the library entirely, so every project's
+    label copy goes with it. Silent on missing files.
+    """
+    try:
+        cloud_data_path(file_key).unlink()
+    except OSError:
+        pass
+    labels_root = Path(library_paths.library_dir()) / _LABELS_SUBDIR
+    _drop_across_namespaces(labels_root, file_key)
+
+
+def drop_labels_namespace(namespace: str) -> None:
+    """Delete an entire label namespace (project deletion). Silent."""
+    ns = sanitize_namespace(namespace)
+    if ns == LIBRARY_NAMESPACE:
+        return  # the library baseline is never bulk-deleted
+    for sub in (_LABELS_SUBDIR, _PREVIEW_LABELS_SUBDIR):
+        try:
+            shutil.rmtree(Path(library_paths.library_dir()) / sub / ns)
+        except OSError:
+            pass
+
+
+def _drop_across_namespaces(root: Path, file_key: str) -> None:
+    if not root.exists():
+        return
+    try:
+        candidates = [root / f"{file_key}.npy"]  # unmigrated v1 flat file
+        candidates += [d / f"{file_key}.npy" for d in root.iterdir()
+                       if d.is_dir()]
+    except OSError:
+        return
+    for p in candidates:
         try:
             p.unlink()
         except OSError:
@@ -758,16 +1002,14 @@ def drop_cloud(file_key: str) -> None:
 
 
 def drop_preview_labels(file_key: str) -> None:
-    """Remove ``preview_labels/<file_key>.npy``. Silent on missing file.
+    """Remove ``preview_labels/*/<file_key>.npy`` across all namespaces.
 
     CP-1: previously orphaned when a cloud was removed via
     ``LibraryCatalog.remove_entry`` because remove_entry didn't drop
     the preview-labels file.
     """
-    try:
-        preview_labels_path(file_key).unlink()
-    except OSError:
-        pass
+    root = Path(library_paths.library_dir()) / _PREVIEW_LABELS_SUBDIR
+    _drop_across_namespaces(root, file_key)
 
 
 # ---------------------------------------------------------------------------
@@ -825,7 +1067,16 @@ def check_catalog_integrity(catalog=None) -> dict:
             return set()
 
     data_keys = _files_in(data_dir, ".npz")
+    # Labels live under per-namespace subdirs (v2); the flat scan also
+    # picks up any unmigrated v1 files sitting at the top level.
     label_keys = _files_in(labels_dir, ".npy")
+    if labels_dir.exists():
+        try:
+            for ns_dir in labels_dir.iterdir():
+                if ns_dir.is_dir():
+                    label_keys |= _files_in(ns_dir, ".npy")
+        except OSError:
+            pass
 
     with_data = indexed_keys & data_keys
     with_labels = indexed_keys & label_keys
