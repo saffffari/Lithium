@@ -8,6 +8,55 @@ keeps the viz env from breaking every time a ML dependency drifts.
 
 This document is the reproducible recipe for that training env.
 
+## Linux quick path (verified 2026-07-20, RTX 4090, driver 610)
+
+The system CUDA toolkit may be too new for the pinned torch (nvcc 13.x
+vs torch cu12.4 → extension build fails on the major-version check),
+so nvcc 12.4 and gcc 13 live inside the env:
+
+```bash
+# Miniforge (user-level)
+curl -fsSL https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh -o /tmp/miniforge.sh
+bash /tmp/miniforge.sh -b -p ~/miniforge3
+
+~/miniforge3/bin/conda create -n 3photon-ptv3 python=3.11 -y
+ENVP=~/miniforge3/envs/3photon-ptv3
+
+# Pinned known-good torch
+$ENVP/bin/pip install torch==2.5.1 torchvision==0.20.1 \
+    --index-url https://download.pytorch.org/whl/cu124
+
+# nvcc 12.4 + gcc 13 inside the env (for the pointops build)
+~/miniforge3/bin/conda install -n 3photon-ptv3 \
+    -c nvidia/label/cuda-12.4.1 cuda-toolkit -y
+~/miniforge3/bin/conda install -n 3photon-ptv3 \
+    -c conda-forge gcc_linux-64=13 gxx_linux-64=13 -y
+
+# Remaining deps (peft + wandb are new hard imports in the pinned
+# Pointcept clone; SharedArray builds fine on Linux)
+$ENVP/bin/pip install torch_scatter torch_cluster torch_sparse \
+    -f https://data.pyg.org/whl/torch-2.5.0+cu124.html
+$ENVP/bin/pip install spconv-cu124 torch-geometric ninja timm addict \
+    yapf termcolor tensorboard tensorboardX ftfy regex tqdm einops \
+    h5py open3d SharedArray peft wandb
+
+# Build pointops against the env's nvcc + gcc
+cd training/pointcept/libs/pointops
+env CUDA_HOME=$ENVP CC=$ENVP/bin/x86_64-conda-linux-gnu-gcc \
+    CXX=$ENVP/bin/x86_64-conda-linux-gnu-g++ \
+    TORCH_CUDA_ARCH_LIST="8.9" $ENVP/bin/python setup.py install
+
+# Verify (from training/pointcept)
+env PYTHONPATH=$PWD $ENVP/bin/python ../../tools/probe_pointcept.py
+env PYTHONPATH=$PWD:../.. $ENVP/bin/python ../../tools/test_generated_config.py
+```
+
+Then set `train_python_exe` / `train_pointcept_dir` in
+`~/.3photon/prefs.json` (or via TRAIN tab → POINTCEPT ENV) to
+`$ENVP/bin/python` and `<repo>/training/pointcept`.
+
+The Windows recipe below remains valid for the Windows box.
+
 ## Prerequisites
 
 - Windows 10/11 (Linux works too, steps are similar)
