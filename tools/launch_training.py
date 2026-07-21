@@ -61,6 +61,10 @@ def main():
     ap.add_argument("--minority-boost", type=float, default=1.0,
                     help="Multiply the LAST 2 class weights (pedicles "
                          "in the 5/6-class spinal ontology). 1.0 = no boost.")
+    ap.add_argument("--weight", default="",
+                    help="Checkpoint to warm-start from (fine-tune / "
+                         "crash recovery). Same field the TRAIN tab's "
+                         "fine-tune uses.")
     ap.add_argument("--no-rotate-so3", action="store_true",
                     help="Disable full SO(3) rotation augmentation. "
                          "Falls back to z-axis-only rotation so absolute "
@@ -97,6 +101,7 @@ def main():
         epochs=args.epochs,
         batch_size=args.batch_size,
         num_worker=args.num_worker,
+        weight=args.weight,
         class_weights=class_weights,
         base_lr=args.base_lr,
         weight_decay=args.weight_decay,
