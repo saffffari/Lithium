@@ -111,6 +111,13 @@ def main():
     )
     generate_ptv3_config(
         params, args.pointcept_ext_dir, str(config_path))
+    # Mirror the dataset's class map next to the checkpoints — the
+    # authoritative record of what the seg head's channels mean, so a
+    # moved checkpoint still resolves (the GUI launch path does the
+    # same; headless runs used to skip it).
+    import shutil
+    shutil.copy2(classes_json, work_dir / "classes.json")
+
     print(f"Config: {config_path}")
     print(f"Work:   {work_dir}")
     print(f"Class weights: {class_weights}")
