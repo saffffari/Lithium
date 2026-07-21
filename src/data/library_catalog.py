@@ -524,6 +524,22 @@ class LibraryCatalog:
         entry.last_opened = time.time()
         self._save_index()
 
+    def reattach_entry_source(self, file_key: str, new_path: str) -> bool:
+        """Point an entry at a moved/renamed source file (CP-5).
+
+        The file_key — and with it every catalog sidecar (data, labels
+        in all namespaces, previews, meshes) — is preserved; only the
+        source path changes. Returns False when the entry is unknown or
+        the new path doesn't exist.
+        """
+        entry = self.entries.get(file_key)
+        if entry is None or not os.path.isfile(new_path):
+            return False
+        entry.file_path = new_path
+        self._exists_cache.pop(file_key, None)
+        self._save_index()
+        return True
+
     def rename_entry(self, file_key: str, display_name: str) -> bool:
         """Persist a user-rename to the catalog (CP-9).
 

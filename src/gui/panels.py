@@ -2894,7 +2894,17 @@ def _draw_train_tab(app):
         model_name = ""
         if active_project_id and sel_idx > 0 and sel_idx <= len(project_models):
             parent_model = project_models[sel_idx - 1]
-            model_name = f"{parent_model.name} ft"
+            # Unique fine-tune name: strip any existing " ft"/" ftN"
+            # suffix so repeated fine-tunes yield "base ft2", "base
+            # ft3" instead of "base ft ft ft".
+            import re as _re
+            _base = _re.sub(r"( ft\d*)+$", "", parent_model.name)
+            _taken = {m.name for m in project_models}
+            model_name = f"{_base} ft"
+            _n = 2
+            while model_name in _taken:
+                model_name = f"{_base} ft{_n}"
+                _n += 1
             btn_label = f"FINE-TUNE FROM {parent_model.name.upper()}"
             btn_color = CORAL
         else:
@@ -3661,6 +3671,37 @@ def _draw_gallery_ctx_popup(app):
                 app._gallery_rename_buf = entry.name
                 imgui.close_current_popup()
                 imgui.open_popup("##gallery_rename")
+
+            # CP-5: re-attach a moved/renamed source file. Only offered
+            # when the entry's source is actually missing — the catalog
+            # copy of the data keeps working either way, but a live
+            # source path re-enables stale-source detection + re-import.
+            _src_missing = (len(targets) == 1 and catalog is not None
+                            and entry.file_key is not None
+                            and not catalog.entry_exists(entry))
+            if _src_missing and imgui.menu_item("Re-attach source...")[0]:
+                imgui.close_current_popup()
+                try:
+                    import tkinter as tk
+                    from tkinter import filedialog
+                    _root = tk.Tk()
+                    _root.withdraw()
+                    _new = filedialog.askopenfilename(
+                        title=f"Re-attach source for {entry.name}")
+                    _root.destroy()
+                except Exception:
+                    _new = ""
+                if _new:
+                    if catalog.reattach_entry_source(entry.file_key, _new):
+                        entry.file_path = _new
+                        if app.cli:
+                            app.cli.log(
+                                f"Re-attached {entry.name} -> {_new}",
+                                "success")
+                    else:
+                        app.set_status_banner(
+                            f"Re-attach failed for {entry.name}",
+                            level="error", source="reattach")
 
             imgui.separator()
 
