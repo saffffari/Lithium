@@ -80,7 +80,14 @@ from src.rendering.gallery_cache import GalleryCache, MAX_DIRTY_PER_FRAME
 MAX_LAZY_PREVIEW_UPLOADS_PER_FRAME = 8
 from src.core.envelope import Envelope
 from src.gui.imgui_layer import ImGuiLayer
-from src.gui.panels import draw_settings_panel, draw_main_menu_bar
+# imgui itself is already loaded (and paid for) via imgui_layer; the
+# module-level binding lets per-frame draw helpers drop their local
+# `import imgui` statements from the hot path.
+import imgui
+from src.gui.panels import (
+    draw_settings_panel, draw_main_menu_bar, drain_pending_label_applies,
+)
+from src.gui.status_banner import draw_status_banner
 from src.gui.measure_panel import draw_measure_panel
 from src.gui.timeline import draw_timeline
 from src.gui.shortcuts_panel import draw_shortcuts_overlay
@@ -157,6 +164,10 @@ class CloudEntry:
         self.orbit_az: float = _math.pi / 4
         self.orbit_el: float = _math.pi / 6
         self.orbit_zoom: float = 1.0
+        # LS-6: set when a label mutation lands on the preview cloud
+        # while the full-res load is still in flight; _poll_full_res
+        # projects that paint onto the full cloud and clears the flag.
+        self._painted_on_preview: bool = False
         # Triangulated mesh — Poisson surface reconstruction of the
         # point cloud, used in HOLOGRAM and as an optional LIGHT TABLE
         # display mode. Built lazily off-thread by
@@ -249,6 +260,12 @@ class App:
         self.frame_count = 0
         self._fps_frame_count = 0
         self._total_point_count = 0
+        # Bumped whenever session-entry state that feeds the gallery
+        # filter changes (bounds becoming available, entry rename via
+        # sequence seek, view rebuild). Part of the memo key in
+        # _gallery_filter_ready_cached, which turned a per-frame O(N)
+        # scan over the whole library into a cache hit.
+        self._entries_filter_version = 0
         # Per-frame sidebar-width memo (see _left_chrome_width).
         self._left_chrome_frame: int = -1
         self._left_chrome_cached: int = 0
@@ -924,6 +941,7 @@ class App:
         if entry.bounds_min is None:
             entry.bounds_min = preview.bounds_min.copy()
             entry.bounds_max = preview.bounds_max.copy()
+            self._invalidate_entries_filter()
         if not entry.point_count:
             entry.point_count = preview.point_count
         self.gpu_clouds.append(gpu)
@@ -1039,16 +1057,38 @@ class App:
         entry.mesh_dirty = False
         return True
 
-    def _gallery_filter_ready_cached(self) -> list:
-        """Per-frame memoised version of _gallery_filter_ready.
+    def _invalidate_entries_filter(self) -> None:
+        """Signal that gallery-filter inputs changed (bounds arrived,
+        entry renamed, view rebuilt). Cheap; call from any mutation
+        site rather than trying to be clever about whether the change
+        matters."""
+        self._entries_filter_version += 1
 
-        The gallery filter is called twice per frame (render + overlay)
-        and O(N) over the entire library. Cache by frame_count so both
-        callers share the result while still refreshing every frame.
+    def _gallery_filter_ready_cached(self) -> list:
+        """Memoised version of _gallery_filter_ready.
+
+        The gallery filter is called several times per frame and is
+        O(N) Python over the entire library, every frame, even when
+        nothing changed. Memoise on a compound key instead:
+
+        - ``gallery_search``: the only filter input the user edits.
+        - ``len(self.entries)``: catches every append (all import
+          paths) without those sites needing to know about the cache.
+        - ``_entries_filter_version``: explicit dirty counter bumped by
+          the sites that mutate filter-relevant per-entry state
+          (bounds None->set in _poll_catalog / _poll_full_res /
+          _ensure_preview_gpu, view rebuild in set_active_view,
+          sequence frame rename in timeline._do_seek).
+
+        Returns the SAME list object until the key changes — callers
+        (e.g. _render_gallery's prune gating) rely on that identity to
+        skip their own O(N) derivations.
         """
-        if getattr(self, '_gallery_ready_frame', -1) != self.frame_count:
+        key = (self.gallery_search, len(self.entries),
+               self._entries_filter_version)
+        if getattr(self, '_gallery_ready_key', None) != key:
             self._gallery_ready_cache = self._gallery_filter_ready()
-            self._gallery_ready_frame = self.frame_count
+            self._gallery_ready_key = key
         return self._gallery_ready_cache
 
     def _find_entry_by_key(self, file_key: str | None,
@@ -1754,6 +1794,9 @@ class App:
         self.active_view = view
         self.mode = MODE_CONTACT_SHEETS
         self._overlays_dirty = True
+        # The entries list was rebuilt wholesale — the length may match
+        # the previous view's, so the memo key alone can't catch it.
+        self._invalidate_entries_filter()
         self.reset_clip()
         self.cursor3d.clear()
         # SC-10: mirror the _select_entry_by_index pattern — clear
@@ -1910,9 +1953,27 @@ class App:
         """Load a directory as a time-series sequence."""
         print(f"Detected 4D sequence: {len(frame_paths)} frames")
         self.sequence = PointCloudSequence(frame_paths, cache_size=3)
-        # Load first frame into a single CloudEntry
+        # LS-1: register every frame with the catalog so each has a
+        # file_key — that's what routes per-stroke persistence, LRU
+        # eviction flush, and page-back-in label reload for sequence
+        # frames through the normal catalog label store. Without this
+        # the frame CloudEntry had no file_key and every persist
+        # silently no-oped, so painted labels died on eviction/exit.
+        self._ensure_catalog()
+        if self.catalog is not None:
+            lib_entries = self.catalog.register_files(frame_paths)
+            self.sequence.frame_keys = [
+                (le.file_key if le is not None else None)
+                for le in lib_entries
+            ]
+            self.sequence.persist_error_cb = (
+                lambda msg: self.set_status_banner(
+                    msg, level="error", source="sequence.persist_labels"))
+        # Load first frame into a single CloudEntry (this also re-applies
+        # any catalog labels persisted for frame 0 in a prior session).
         cloud = self.sequence.get_frame(0)
-        entry = CloudEntry(frame_paths[0])
+        entry = CloudEntry(frame_paths[0],
+                           file_key=self.sequence.frame_key(0))
         entry.bounds_min = cloud.bounds_min.copy()
         entry.bounds_max = cloud.bounds_max.copy()
         entry.point_count = cloud.point_count
@@ -1956,6 +2017,7 @@ class App:
                 entry.point_count = lib_entry.point_count
                 self.gpu_clouds.append(gpu)
                 self._overlays_dirty = True
+                self._invalidate_entries_filter()
                 print(f"Ready: {entry.name} ({lib_entry.point_count:,} pts)")
                 break
 
@@ -1995,11 +2057,37 @@ class App:
         file_key = getattr(entry, 'file_key', None)
         file_path = entry.file_path
         model_xform = entry.model_transform.copy()
+        # LS-6: snapshot the preview's positions so the loader thread can
+        # build the preview->full nearest-neighbour map alongside the
+        # load. Positions never mutate after upload, so handing the
+        # array to the worker read-only is safe.
+        preview_positions = None
+        pgpu = entry.preview_gpu
+        if pgpu is not None and pgpu.cloud_data is not None:
+            preview_positions = pgpu.cloud_data.positions
         future = self._full_res_executor.submit(
-            self._load_cloud_via_catalog, file_key, file_path
+            self._full_res_load_job, file_key, file_path, preview_positions
         )
         self._full_res_pending = (index, future, model_xform, file_key)
         print(f"Loading full res: {entry.name} ...")
+
+    def _full_res_load_job(self, file_key, file_path, preview_positions):
+        """Background-thread body of the async full-res load.
+
+        Loads the cloud (catalog-first) and, when a preview snapshot was
+        provided, builds the preview->full index map here — the KD-tree
+        build is O(N log N) and must never run on the frame loop (LS-6).
+        Returns ``(cloud, used_source, preview_to_full_idx | None)``.
+        Read-only with respect to app state (Pattern A: workers never
+        mutate app.*).
+        """
+        cloud, used_source = self._load_cloud_via_catalog(file_key, file_path)
+        mapping = None
+        if preview_positions is not None:
+            from src.core.preview_merge import build_preview_to_full_idx
+            mapping = build_preview_to_full_idx(
+                preview_positions, cloud.positions)
+        return cloud, used_source, mapping
 
     def _poll_full_res(self):
         """Upload completed async full-res load to GPU."""
@@ -2019,32 +2107,74 @@ class App:
         if entry.full_gpu is not None:
             return
         try:
-            cloud, _ = future.result()
+            cloud, _, preview_to_full = future.result()
             cloud.model_transform = model_xform
 
             # If the user painted labels on the preview cloud while the
             # full-res load was in flight, the preview labels are newer
-            # than whatever the catalog had on disk. Merge them: for each
-            # point in the full-res cloud that has a matching preview
-            # point, prefer the preview's label if it is non-zero.
+            # than whatever the catalog had on disk. Merge them onto the
+            # full cloud (LS-6): equal lengths copy straight across;
+            # otherwise scatter the non-zero preview labels through the
+            # preview->full index map the loader thread built. Pre-fix,
+            # the mismatched-length case silently dropped the paint (the
+            # persist guard rejects preview-length arrays).
+            merged = 0
+            merge_lost = False
             preview_gpu = entry.preview_gpu
             if (preview_gpu is not None
                     and preview_gpu.cloud_data is not None
                     and preview_gpu.cloud_data.labels is not None
                     and (preview_gpu.cloud_data.labels != 0).any()):
                 preview_labels = preview_gpu.cloud_data.labels
-                # If counts match (preview is a subsample, so they usually
-                # don't), direct copy. Otherwise just persist what the
-                # preview had — the catalog file is the source of truth
-                # for the next load and it was already flushed on paint.
                 if len(preview_labels) == cloud.point_count:
                     cloud.labels[:] = preview_labels
+                elif getattr(entry, '_painted_on_preview', False):
+                    if cloud.labels is None:
+                        cloud.labels = np.zeros(cloud.point_count,
+                                                dtype=np.int32)
+                    from src.core.preview_merge import (
+                        merge_preview_labels_into_full,
+                    )
+                    merged = merge_preview_labels_into_full(
+                        cloud.labels, preview_labels, preview_to_full)
+                    if merged == 0:
+                        merge_lost = True
+            entry._painted_on_preview = False
 
             gpu = upload_cloud(cloud, self.ctx, self.program)
             entry.full_gpu = gpu
             entry.bounds_min = cloud.bounds_min.copy()
             entry.bounds_max = cloud.bounds_max.copy()
             entry.point_count = cloud.point_count
+            self._invalidate_entries_filter()
+            # Seed the preview<->full map cache so the first
+            # _propagate_labels_to_preview after a paint doesn't rebuild
+            # the KD-tree the loader thread already built.
+            if (preview_to_full is not None
+                    and preview_gpu is not None
+                    and preview_gpu.cloud_data is not None
+                    and len(preview_to_full) == preview_gpu.cloud_data.point_count):
+                entry._preview_to_full_idx_cache = (
+                    (id(cloud), preview_gpu.cloud_data.point_count),
+                    preview_to_full,
+                )
+            # LS-6: persist the merged labels through the normal path —
+            # entry.point_count now matches cloud.labels, so the length
+            # guard passes and the paint survives a restart.
+            if merged:
+                self._persist_cloud_labels(entry, cloud)
+                print(f"Merged {merged:,} preview-painted points onto "
+                      f"{entry.name} full res")
+            elif merge_lost:
+                # Projection unavailable (scipy missing / degenerate
+                # geometry): keep the old behaviour but say so instead
+                # of silently dropping the stroke.
+                self.set_status_banner(
+                    f"Couldn't carry preview paint onto {entry.name} at "
+                    f"full resolution — please re-paint that stroke.",
+                    level="warn",
+                    source=f"preview_merge:{expected_key}",
+                )
             # Coordinate metadata from catalog round-trip
             meta = cloud.metadata if cloud.metadata else {}
             wo = meta.get('world_offset')
@@ -2292,7 +2422,6 @@ class App:
                     # comfortably inside one 60 fps frame budget. Higher
                     # throughput means a 50-cloud batch visibly lands in
                     # ~13 frames instead of 50.
-                    from src.gui.panels import drain_pending_label_applies
                     drain_pending_label_applies(self, max_per_frame=4)
 
                     # Drain the generic Pattern A subprocess→main-thread
@@ -2361,7 +2490,6 @@ class App:
 
         # Sticky status banner for save / load failures. Sits just under
         # the menu bar. No-op when no banner is active.
-        from src.gui.status_banner import draw_status_banner
         draw_status_banner(self)
 
         # === HDR scene pass ===
@@ -2607,7 +2735,6 @@ class App:
             # allowed is an explicit empty set → no toolbar at all.
             return
 
-        import imgui
         from src.gui.scale import s
         from src.gui.theme import (OP1_RED, OP1_BLUE, OP1_GREEN, OP1_WHITE,
                                    OP1_ORANGE, OP1_DIM, OP1_GRAY, col32)
@@ -2715,7 +2842,6 @@ class App:
             return
         if self.mode != MODE_LIGHT_TABLE:
             return
-        import imgui
         from src.gui.scale import s
         from src.gui.theme import OP1_RED, OP1_GREEN, OP1_BLUE, col32
 
@@ -2801,7 +2927,6 @@ class App:
         same neutral grey, just a bit larger so it reads as a centered
         focal element without dominating the viewport.
         """
-        import imgui
         from src.gui.scale import s
         from src.gui.theme import OP1_GRAY, col32
         from src.gui.op1_widgets import op1_alien
@@ -2836,7 +2961,6 @@ class App:
 
     def _draw_tool_overlay(self):
         """Draw rubber-band rectangle or lasso path for active drag."""
-        import imgui
         from src.gui.scale import s
         dl = imgui.get_foreground_draw_list()
 
@@ -2927,7 +3051,6 @@ class App:
         sits on top of everything in the viewport.  Called only from
         _draw_tool_overlay when a measure tool is active.
         """
-        import imgui
 
         measure = self._measure
 
@@ -3204,7 +3327,6 @@ class App:
         reference-vertebra switches re-anchor the measurements onto
         their bones automatically.
         """
-        import imgui
 
         if not self.measure_registry.items:
             return
@@ -3903,7 +4025,14 @@ class App:
         per-cell invalidation).
         """
         ready_pairs = self._gallery_filter_ready_cached()
-        ready = [e for _, e in ready_pairs]
+        # The memo returns the same list object until the filter inputs
+        # change — derive the entries-only view (and prune the cell
+        # cache, below) only on identity change instead of every frame.
+        if getattr(self, '_gallery_ready_pairs_obj', None) is not ready_pairs:
+            self._gallery_ready_pairs_obj = ready_pairs
+            self._gallery_ready_entries = [e for _, e in ready_pairs]
+            self._gallery_prune_pending = True
+        ready = self._gallery_ready_entries
         if not ready:
             return
 
@@ -3934,7 +4063,13 @@ class App:
             float(self.label_blend),
         )
         cache.bump_global(global_key)
-        cache.prune({getattr(e, 'file_key', None) or id(e) for e in ready})
+        # Prune only when the visible entry set actually changed (flag
+        # set above on ready-list identity change) — building the key
+        # set was an O(N) per-frame cost for zero effect on the frames
+        # where nothing entered or left the view.
+        if getattr(self, '_gallery_prune_pending', False):
+            cache.prune({getattr(e, 'file_key', None) or id(e) for e in ready})
+            self._gallery_prune_pending = False
 
         # Visible-row culling: we only ever touch entries whose row is
         # currently on screen (or partially on screen). This is the
@@ -4082,7 +4217,6 @@ class App:
         culling) so a 5000-cell library still costs the same per-frame
         as a 30-cell visible window.
         """
-        import imgui
         from src.gui.scale import s
 
         sw = self._left_chrome_width()
@@ -4193,7 +4327,6 @@ class App:
     def _draw_gallery_empty_state(self, area_x: int, area_y: int,
                                    area_w: int, area_h: int) -> None:
         """Centered hint for an empty Contact Sheets viewport."""
-        import imgui
         from src.gui.scale import s
         dl = imgui.get_foreground_draw_list()
         msg_main = "Pick a project or folder in the sidebar"
@@ -4216,7 +4349,6 @@ class App:
         and drag it. Same neutral grey as the rest of the chrome — no
         accent color, no hover halo, just a slim track + handle.
         """
-        import imgui
         from src.gui.scale import s
         gutter_w = s(8)
         track_x = area_x + area_w - gutter_w - s(2)
@@ -4363,6 +4495,16 @@ class App:
                         save_preview_labels(file_key, prev)
             except Exception:
                 pass
+
+        # LS-1: flush labels for every LRU-cached sequence frame. The
+        # entries loop above only covers the frame currently on the GPU;
+        # the other cached frames (painted then scrubbed away from, or
+        # written by automation propagate) live only in sequence._cache.
+        if getattr(self, "sequence", None) is not None:
+            try:
+                self.sequence.flush_labels()
+            except Exception as e:
+                print(f"[cleanup] sequence label flush failed: {e}")
 
         # Restore cursor in case brush tool left it hidden
         try:
@@ -5104,6 +5246,11 @@ class App:
             entry = self.entries[self.selected_index]
             if gpu is entry.full_gpu and entry.preview_gpu is not None and entry.preview_gpu is not gpu:
                 self._propagate_labels_to_preview(entry)
+            # LS-6: mutation landed on the preview while full-res is
+            # still loading — flag it so _poll_full_res projects the
+            # paint onto the full cloud when it arrives.
+            if entry.full_gpu is None and gpu is entry.preview_gpu:
+                entry._painted_on_preview = True
         # Catalog persistence: write the labels file for this cloud's
         # file_key.
         if not self.stroke_recorder.is_active:

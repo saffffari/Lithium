@@ -67,14 +67,31 @@ def _do_seek(app, index: int) -> bool:
         return False
     if not (0 <= app.selected_index < len(app.entries)):
         return False
+
+    entry = app.entries[app.selected_index]
+
+    # LS-1: persist the outgoing frame's labels through the normal
+    # per-entry path before it can be LRU-evicted. entry.file_key is
+    # kept pointing at the *current* frame (set below on every seek),
+    # so the length guard in _persist_cloud_labels lines up.
+    old_gpu = entry.full_gpu or entry.preview_gpu
+    if old_gpu is not None and old_gpu.cloud_data is not None:
+        try:
+            app._persist_cloud_labels(entry, old_gpu.cloud_data)
+        except Exception as e:
+            print(f"[timeline] persist before seek failed: {e}")
+
     try:
         new_cloud = app.sequence.seek(index)
     except Exception as e:
         print(f"Seek failed: {e}")
         return False
+    # ``seek`` clamps out-of-range indices (arrow-key stepping past the
+    # ends passes current±1 unclamped) — use the clamped value for the
+    # name/key lookups below so they can't IndexError.
+    index = app.sequence.current_index
 
     # Swap the GPU cloud for the selected entry
-    entry = app.entries[app.selected_index]
     from src.rendering.point_cloud_renderer import upload_cloud
     # Release the old GPU
     if entry.full_gpu is not None:
@@ -91,6 +108,12 @@ def _do_seek(app, index: int) -> bool:
     entry.bounds_min = new_cloud.bounds_min.copy()
     entry.bounds_max = new_cloud.bounds_max.copy()
     entry.name = app.sequence.frame_name(index)
+    # LS-1: keep the session entry's file_key pinned to the current
+    # frame so every per-stroke persist lands in the right catalog slot.
+    entry.file_key = app.sequence.frame_key(index)
+    # Entry name/bounds changed — refresh the memoised gallery filter.
+    if hasattr(app, '_invalidate_entries_filter'):
+        app._invalidate_entries_filter()
     app.selection_buffer.resize(new_cloud.point_count)
     app.selection_buffer.clear()
     # The new cloud is a different Python object — the label-count cache

@@ -500,6 +500,40 @@ class LibraryCatalog:
         self._save_index()
         return entry
 
+    def register_files(self, file_paths: list[str]) -> list["LibraryEntry | None"]:
+        """Batch ``register_file`` with a single index save at the end.
+
+        LS-1: 4D sequence load registers every frame so each gets a
+        file_key for label persistence — doing that through
+        ``register_file`` would rewrite index.json once per frame.
+        Returns one entry (or None for unreadable paths) per input, in
+        order.
+        """
+        out: list[LibraryEntry | None] = []
+        dirty = False
+        for file_path in file_paths:
+            if not os.path.isfile(file_path):
+                out.append(None)
+                continue
+            try:
+                file_key = compute_file_key(file_path)
+            except OSError:
+                out.append(None)
+                continue
+            existing = self.entries.get(file_key)
+            if existing is not None:
+                existing.last_opened = time.time()
+                out.append(existing)
+                dirty = True
+                continue
+            entry = LibraryEntry(file_key=file_key, file_path=file_path)
+            self.entries[file_key] = entry
+            out.append(entry)
+            dirty = True
+        if dirty:
+            self._save_index()
+        return out
+
     def update_metrics(
         self,
         file_key: str,
