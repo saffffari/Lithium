@@ -175,7 +175,11 @@ def main():
             proc.wait()
     print(f"\n[launcher] subprocess exited with code {proc.returncode}")
     print(f"[launcher] full log: {log_path}")
+    # Propagate the training exit code — retry wrappers and CI need a
+    # non-zero exit when the run died. (A crashed run used to exit 0
+    # here, which made train_until_done.sh declare victory on failure.)
+    return proc.returncode
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
