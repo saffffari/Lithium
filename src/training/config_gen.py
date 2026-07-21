@@ -103,6 +103,11 @@ class PTv3TrainParams:
     weight_decay: float = 0.05
     warmup_epochs: int = 10
     enable_amp: bool = True
+    # bfloat16 by default: fp32 exponent range at fp16 speed on Ampere+
+    # GPUs. float16 AMP produced sporadic device-side scatter asserts
+    # in backward on the 4090 (index corruption downstream of fp16
+    # overflow); bf16 removes that failure mode at zero cost.
+    amp_dtype: str = "bfloat16"
     mix_prob: float = 0.0         # PointMix on single-object clouds is noisy
     empty_cache: bool = False
 
@@ -225,7 +230,7 @@ gradient_accumulation_steps = 1
 clip_grad = None
 sync_bn = False
 enable_amp = {params.enable_amp}
-amp_dtype = "float16"
+amp_dtype = "{params.amp_dtype}"
 empty_cache = {params.empty_cache}
 # Per-epoch CUDA cache reset. PT-v3m1 with attention on variable-size
 # point clouds fragments the caching allocator badly after ~30-40 epochs
