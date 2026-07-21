@@ -111,6 +111,9 @@ def _do_seek(app, index: int) -> bool:
     # LS-1: keep the session entry's file_key pinned to the current
     # frame so every per-stroke persist lands in the right catalog slot.
     entry.file_key = app.sequence.frame_key(index)
+    # Entry name/bounds changed — refresh the memoised gallery filter.
+    if hasattr(app, '_invalidate_entries_filter'):
+        app._invalidate_entries_filter()
     app.selection_buffer.resize(new_cloud.point_count)
     app.selection_buffer.clear()
     # The new cloud is a different Python object — the label-count cache

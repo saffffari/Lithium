@@ -80,7 +80,14 @@ from src.rendering.gallery_cache import GalleryCache, MAX_DIRTY_PER_FRAME
 MAX_LAZY_PREVIEW_UPLOADS_PER_FRAME = 8
 from src.core.envelope import Envelope
 from src.gui.imgui_layer import ImGuiLayer
-from src.gui.panels import draw_settings_panel, draw_main_menu_bar
+# imgui itself is already loaded (and paid for) via imgui_layer; the
+# module-level binding lets per-frame draw helpers drop their local
+# `import imgui` statements from the hot path.
+import imgui
+from src.gui.panels import (
+    draw_settings_panel, draw_main_menu_bar, drain_pending_label_applies,
+)
+from src.gui.status_banner import draw_status_banner
 from src.gui.measure_panel import draw_measure_panel
 from src.gui.timeline import draw_timeline
 from src.gui.shortcuts_panel import draw_shortcuts_overlay
@@ -253,6 +260,12 @@ class App:
         self.frame_count = 0
         self._fps_frame_count = 0
         self._total_point_count = 0
+        # Bumped whenever session-entry state that feeds the gallery
+        # filter changes (bounds becoming available, entry rename via
+        # sequence seek, view rebuild). Part of the memo key in
+        # _gallery_filter_ready_cached, which turned a per-frame O(N)
+        # scan over the whole library into a cache hit.
+        self._entries_filter_version = 0
         # Per-frame sidebar-width memo (see _left_chrome_width).
         self._left_chrome_frame: int = -1
         self._left_chrome_cached: int = 0
@@ -928,6 +941,7 @@ class App:
         if entry.bounds_min is None:
             entry.bounds_min = preview.bounds_min.copy()
             entry.bounds_max = preview.bounds_max.copy()
+            self._invalidate_entries_filter()
         if not entry.point_count:
             entry.point_count = preview.point_count
         self.gpu_clouds.append(gpu)
@@ -1043,16 +1057,38 @@ class App:
         entry.mesh_dirty = False
         return True
 
-    def _gallery_filter_ready_cached(self) -> list:
-        """Per-frame memoised version of _gallery_filter_ready.
+    def _invalidate_entries_filter(self) -> None:
+        """Signal that gallery-filter inputs changed (bounds arrived,
+        entry renamed, view rebuilt). Cheap; call from any mutation
+        site rather than trying to be clever about whether the change
+        matters."""
+        self._entries_filter_version += 1
 
-        The gallery filter is called twice per frame (render + overlay)
-        and O(N) over the entire library. Cache by frame_count so both
-        callers share the result while still refreshing every frame.
+    def _gallery_filter_ready_cached(self) -> list:
+        """Memoised version of _gallery_filter_ready.
+
+        The gallery filter is called several times per frame and is
+        O(N) Python over the entire library, every frame, even when
+        nothing changed. Memoise on a compound key instead:
+
+        - ``gallery_search``: the only filter input the user edits.
+        - ``len(self.entries)``: catches every append (all import
+          paths) without those sites needing to know about the cache.
+        - ``_entries_filter_version``: explicit dirty counter bumped by
+          the sites that mutate filter-relevant per-entry state
+          (bounds None->set in _poll_catalog / _poll_full_res /
+          _ensure_preview_gpu, view rebuild in set_active_view,
+          sequence frame rename in timeline._do_seek).
+
+        Returns the SAME list object until the key changes — callers
+        (e.g. _render_gallery's prune gating) rely on that identity to
+        skip their own O(N) derivations.
         """
-        if getattr(self, '_gallery_ready_frame', -1) != self.frame_count:
+        key = (self.gallery_search, len(self.entries),
+               self._entries_filter_version)
+        if getattr(self, '_gallery_ready_key', None) != key:
             self._gallery_ready_cache = self._gallery_filter_ready()
-            self._gallery_ready_frame = self.frame_count
+            self._gallery_ready_key = key
         return self._gallery_ready_cache
 
     def _find_entry_by_key(self, file_key: str | None,
@@ -1758,6 +1794,9 @@ class App:
         self.active_view = view
         self.mode = MODE_CONTACT_SHEETS
         self._overlays_dirty = True
+        # The entries list was rebuilt wholesale — the length may match
+        # the previous view's, so the memo key alone can't catch it.
+        self._invalidate_entries_filter()
         self.reset_clip()
         self.cursor3d.clear()
         # SC-10: mirror the _select_entry_by_index pattern — clear
@@ -1978,6 +2017,7 @@ class App:
                 entry.point_count = lib_entry.point_count
                 self.gpu_clouds.append(gpu)
                 self._overlays_dirty = True
+                self._invalidate_entries_filter()
                 print(f"Ready: {entry.name} ({lib_entry.point_count:,} pts)")
                 break
 
@@ -2106,6 +2146,7 @@ class App:
             entry.bounds_min = cloud.bounds_min.copy()
             entry.bounds_max = cloud.bounds_max.copy()
             entry.point_count = cloud.point_count
+            self._invalidate_entries_filter()
             # Seed the preview<->full map cache so the first
             # _propagate_labels_to_preview after a paint doesn't rebuild
             # the KD-tree the loader thread already built.
@@ -2381,7 +2422,6 @@ class App:
                     # comfortably inside one 60 fps frame budget. Higher
                     # throughput means a 50-cloud batch visibly lands in
                     # ~13 frames instead of 50.
-                    from src.gui.panels import drain_pending_label_applies
                     drain_pending_label_applies(self, max_per_frame=4)
 
                     # Drain the generic Pattern A subprocess→main-thread
@@ -2450,7 +2490,6 @@ class App:
 
         # Sticky status banner for save / load failures. Sits just under
         # the menu bar. No-op when no banner is active.
-        from src.gui.status_banner import draw_status_banner
         draw_status_banner(self)
 
         # === HDR scene pass ===
@@ -2696,7 +2735,6 @@ class App:
             # allowed is an explicit empty set → no toolbar at all.
             return
 
-        import imgui
         from src.gui.scale import s
         from src.gui.theme import (OP1_RED, OP1_BLUE, OP1_GREEN, OP1_WHITE,
                                    OP1_ORANGE, OP1_DIM, OP1_GRAY, col32)
@@ -2804,7 +2842,6 @@ class App:
             return
         if self.mode != MODE_LIGHT_TABLE:
             return
-        import imgui
         from src.gui.scale import s
         from src.gui.theme import OP1_RED, OP1_GREEN, OP1_BLUE, col32
 
@@ -2890,7 +2927,6 @@ class App:
         same neutral grey, just a bit larger so it reads as a centered
         focal element without dominating the viewport.
         """
-        import imgui
         from src.gui.scale import s
         from src.gui.theme import OP1_GRAY, col32
         from src.gui.op1_widgets import op1_alien
@@ -2925,7 +2961,6 @@ class App:
 
     def _draw_tool_overlay(self):
         """Draw rubber-band rectangle or lasso path for active drag."""
-        import imgui
         from src.gui.scale import s
         dl = imgui.get_foreground_draw_list()
 
@@ -3016,7 +3051,6 @@ class App:
         sits on top of everything in the viewport.  Called only from
         _draw_tool_overlay when a measure tool is active.
         """
-        import imgui
 
         measure = self._measure
 
@@ -3293,7 +3327,6 @@ class App:
         reference-vertebra switches re-anchor the measurements onto
         their bones automatically.
         """
-        import imgui
 
         if not self.measure_registry.items:
             return
@@ -3992,7 +4025,14 @@ class App:
         per-cell invalidation).
         """
         ready_pairs = self._gallery_filter_ready_cached()
-        ready = [e for _, e in ready_pairs]
+        # The memo returns the same list object until the filter inputs
+        # change — derive the entries-only view (and prune the cell
+        # cache, below) only on identity change instead of every frame.
+        if getattr(self, '_gallery_ready_pairs_obj', None) is not ready_pairs:
+            self._gallery_ready_pairs_obj = ready_pairs
+            self._gallery_ready_entries = [e for _, e in ready_pairs]
+            self._gallery_prune_pending = True
+        ready = self._gallery_ready_entries
         if not ready:
             return
 
@@ -4023,7 +4063,13 @@ class App:
             float(self.label_blend),
         )
         cache.bump_global(global_key)
-        cache.prune({getattr(e, 'file_key', None) or id(e) for e in ready})
+        # Prune only when the visible entry set actually changed (flag
+        # set above on ready-list identity change) — building the key
+        # set was an O(N) per-frame cost for zero effect on the frames
+        # where nothing entered or left the view.
+        if getattr(self, '_gallery_prune_pending', False):
+            cache.prune({getattr(e, 'file_key', None) or id(e) for e in ready})
+            self._gallery_prune_pending = False
 
         # Visible-row culling: we only ever touch entries whose row is
         # currently on screen (or partially on screen). This is the
@@ -4171,7 +4217,6 @@ class App:
         culling) so a 5000-cell library still costs the same per-frame
         as a 30-cell visible window.
         """
-        import imgui
         from src.gui.scale import s
 
         sw = self._left_chrome_width()
@@ -4282,7 +4327,6 @@ class App:
     def _draw_gallery_empty_state(self, area_x: int, area_y: int,
                                    area_w: int, area_h: int) -> None:
         """Centered hint for an empty Contact Sheets viewport."""
-        import imgui
         from src.gui.scale import s
         dl = imgui.get_foreground_draw_list()
         msg_main = "Pick a project or folder in the sidebar"
@@ -4305,7 +4349,6 @@ class App:
         and drag it. Same neutral grey as the rest of the chrome — no
         accent color, no hover halo, just a slim track + handle.
         """
-        import imgui
         from src.gui.scale import s
         gutter_w = s(8)
         track_x = area_x + area_w - gutter_w - s(2)

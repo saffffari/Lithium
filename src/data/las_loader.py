@@ -1,13 +1,19 @@
 """LAS/LAZ file loader."""
 
 import numpy as np
-import laspy
 
 from src.data.point_cloud import PointCloudData
 
 
 def load_las(path: str) -> PointCloudData:
     """Load a LAS or LAZ file and return a PointCloudData instance."""
+    # Lazy import: laspy's import subtree costs ~15-20 ms and sat on
+    # every app launch via loader.py -> las_loader, even for sessions
+    # that never touch a .las/.laz file. Deferring it to first use
+    # moves that cost to the first LAS load, where the disk read
+    # dwarfs it anyway.
+    import laspy
+
     try:
         las = laspy.read(path)
     except (OSError, ValueError, EOFError, laspy.errors.LaspyException) as e:
