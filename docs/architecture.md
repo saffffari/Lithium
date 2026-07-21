@@ -41,7 +41,7 @@ The one acknowledged exception: `gui/` and `main.py` form a tight bidirectional 
 
 The decisions that have proven durable are documented in [_audit/ORIENTATION.md](../_audit/ORIENTATION.md) ("What's surprising or non-obvious"). Highlights:
 
-- **The catalog *is* the dataset.** Once a cloud is imported, its labels live under `~/.3photon/library/labels/<file_key>.npy` forever. There is no separate "save project" step.
+- **The catalog *is* the dataset.** Once a cloud is imported, its labels live under `~/.3photon/library/labels/<namespace>/<file_key>.npy` forever (namespace = project id, or `_library` outside projects — see [design-1.1.md](design-1.1.md)). There is no separate "save project" step.
 - **Anchors are cloud-local.** `(cloud_key, local_pos)` — never world coords. Measurements survive model-matrix changes because the resolver applies the current model matrix at eval time.
 - **GPU per-stroke label upload is 4 MB, not 32 MB**, via the 4-VBO split in `src/rendering/point_cloud_renderer.py`.
 - **GPU uploads happen once.** Cloud geometry is uploaded to VBOs at load time; only uniforms change per frame.
