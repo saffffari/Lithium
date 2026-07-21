@@ -39,4 +39,9 @@ def generate_sphere_ply(path: str, n_points: int = 100000):
     print(f"Generated {n_points:,} points -> {path}")
 
 if __name__ == '__main__':
-    generate_sphere_ply('D:/3Photon/data/test_sphere.ply', n_points=100000)
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("output", nargs="?", default="test_sphere.ply")
+    ap.add_argument("--points", type=int, default=100000)
+    args = ap.parse_args()
+    generate_sphere_ply(args.output, n_points=args.points)
