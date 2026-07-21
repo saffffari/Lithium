@@ -157,6 +157,10 @@ class CloudEntry:
         self.orbit_az: float = _math.pi / 4
         self.orbit_el: float = _math.pi / 6
         self.orbit_zoom: float = 1.0
+        # LS-6: set when a label mutation lands on the preview cloud
+        # while the full-res load is still in flight; _poll_full_res
+        # projects that paint onto the full cloud and clears the flag.
+        self._painted_on_preview: bool = False
         # Triangulated mesh — Poisson surface reconstruction of the
         # point cloud, used in HOLOGRAM and as an optional LIGHT TABLE
         # display mode. Built lazily off-thread by
@@ -2013,11 +2017,37 @@ class App:
         file_key = getattr(entry, 'file_key', None)
         file_path = entry.file_path
         model_xform = entry.model_transform.copy()
+        # LS-6: snapshot the preview's positions so the loader thread can
+        # build the preview->full nearest-neighbour map alongside the
+        # load. Positions never mutate after upload, so handing the
+        # array to the worker read-only is safe.
+        preview_positions = None
+        pgpu = entry.preview_gpu
+        if pgpu is not None and pgpu.cloud_data is not None:
+            preview_positions = pgpu.cloud_data.positions
         future = self._full_res_executor.submit(
-            self._load_cloud_via_catalog, file_key, file_path
+            self._full_res_load_job, file_key, file_path, preview_positions
         )
         self._full_res_pending = (index, future, model_xform, file_key)
         print(f"Loading full res: {entry.name} ...")
+
+    def _full_res_load_job(self, file_key, file_path, preview_positions):
+        """Background-thread body of the async full-res load.
+
+        Loads the cloud (catalog-first) and, when a preview snapshot was
+        provided, builds the preview->full index map here — the KD-tree
+        build is O(N log N) and must never run on the frame loop (LS-6).
+        Returns ``(cloud, used_source, preview_to_full_idx | None)``.
+        Read-only with respect to app state (Pattern A: workers never
+        mutate app.*).
+        """
+        cloud, used_source = self._load_cloud_via_catalog(file_key, file_path)
+        mapping = None
+        if preview_positions is not None:
+            from src.core.preview_merge import build_preview_to_full_idx
+            mapping = build_preview_to_full_idx(
+                preview_positions, cloud.positions)
+        return cloud, used_source, mapping
 
     def _poll_full_res(self):
         """Upload completed async full-res load to GPU."""
@@ -2037,32 +2067,73 @@ class App:
         if entry.full_gpu is not None:
             return
         try:
-            cloud, _ = future.result()
+            cloud, _, preview_to_full = future.result()
             cloud.model_transform = model_xform
 
             # If the user painted labels on the preview cloud while the
             # full-res load was in flight, the preview labels are newer
-            # than whatever the catalog had on disk. Merge them: for each
-            # point in the full-res cloud that has a matching preview
-            # point, prefer the preview's label if it is non-zero.
+            # than whatever the catalog had on disk. Merge them onto the
+            # full cloud (LS-6): equal lengths copy straight across;
+            # otherwise scatter the non-zero preview labels through the
+            # preview->full index map the loader thread built. Pre-fix,
+            # the mismatched-length case silently dropped the paint (the
+            # persist guard rejects preview-length arrays).
+            merged = 0
+            merge_lost = False
             preview_gpu = entry.preview_gpu
             if (preview_gpu is not None
                     and preview_gpu.cloud_data is not None
                     and preview_gpu.cloud_data.labels is not None
                     and (preview_gpu.cloud_data.labels != 0).any()):
                 preview_labels = preview_gpu.cloud_data.labels
-                # If counts match (preview is a subsample, so they usually
-                # don't), direct copy. Otherwise just persist what the
-                # preview had — the catalog file is the source of truth
-                # for the next load and it was already flushed on paint.
                 if len(preview_labels) == cloud.point_count:
                     cloud.labels[:] = preview_labels
+                elif getattr(entry, '_painted_on_preview', False):
+                    if cloud.labels is None:
+                        cloud.labels = np.zeros(cloud.point_count,
+                                                dtype=np.int32)
+                    from src.core.preview_merge import (
+                        merge_preview_labels_into_full,
+                    )
+                    merged = merge_preview_labels_into_full(
+                        cloud.labels, preview_labels, preview_to_full)
+                    if merged == 0:
+                        merge_lost = True
+            entry._painted_on_preview = False
 
             gpu = upload_cloud(cloud, self.ctx, self.program)
             entry.full_gpu = gpu
             entry.bounds_min = cloud.bounds_min.copy()
             entry.bounds_max = cloud.bounds_max.copy()
             entry.point_count = cloud.point_count
+            # Seed the preview<->full map cache so the first
+            # _propagate_labels_to_preview after a paint doesn't rebuild
+            # the KD-tree the loader thread already built.
+            if (preview_to_full is not None
+                    and preview_gpu is not None
+                    and preview_gpu.cloud_data is not None
+                    and len(preview_to_full) == preview_gpu.cloud_data.point_count):
+                entry._preview_to_full_idx_cache = (
+                    (id(cloud), preview_gpu.cloud_data.point_count),
+                    preview_to_full,
+                )
+            # LS-6: persist the merged labels through the normal path —
+            # entry.point_count now matches cloud.labels, so the length
+            # guard passes and the paint survives a restart.
+            if merged:
+                self._persist_cloud_labels(entry, cloud)
+                print(f"Merged {merged:,} preview-painted points onto "
+                      f"{entry.name} full res")
+            elif merge_lost:
+                # Projection unavailable (scipy missing / degenerate
+                # geometry): keep the old behaviour but say so instead
+                # of silently dropping the stroke.
+                self.set_status_banner(
+                    f"Couldn't carry preview paint onto {entry.name} at "
+                    f"full resolution — please re-paint that stroke.",
+                    level="warn",
+                    source=f"preview_merge:{expected_key}",
+                )
             # Coordinate metadata from catalog round-trip
             meta = cloud.metadata if cloud.metadata else {}
             wo = meta.get('world_offset')
@@ -5132,6 +5203,11 @@ class App:
             entry = self.entries[self.selected_index]
             if gpu is entry.full_gpu and entry.preview_gpu is not None and entry.preview_gpu is not gpu:
                 self._propagate_labels_to_preview(entry)
+            # LS-6: mutation landed on the preview while full-res is
+            # still loading — flag it so _poll_full_res projects the
+            # paint onto the full cloud when it arrives.
+            if entry.full_gpu is None and gpu is entry.preview_gpu:
+                entry._painted_on_preview = True
         # Catalog persistence: write the labels file for this cloud's
         # file_key.
         if not self.stroke_recorder.is_active:
