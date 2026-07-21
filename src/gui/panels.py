@@ -2702,15 +2702,64 @@ def _draw_train_tab(app):
                 dl.add_circle_filled(cx + dot_r + 2, cy + th * 0.5, dot_r,
                                      imgui.get_color_u32_rgba(*dot_col))
 
-                # Selectable row
+                # Selectable row. Fine-tune lineage marker: "↳ parent"
+                # after the metrics when this model descends from
+                # another registry entry.
                 imgui.indent(th * 0.7)
                 is_sel = (sel_idx == i + 1)
                 miou_str = f"{m.best_miou:.3f}" if m.best_miou > 0 else "---"
-                row_label = f"{m.name:<20s} {miou_str}  {m.epochs}ep"
+                lineage = ""
+                if m.parent_model_id:
+                    parent = next((p for p in project_models
+                                   if p.model_id == m.parent_model_id), None)
+                    lineage = (f"  ↳ {parent.name[:14]}" if parent
+                               else "  ↳ (gone)")
+                row_label = f"{m.name:<20s} {miou_str}  {m.epochs}ep{lineage}"
                 clicked, _ = imgui.selectable(f"{row_label}##model_{i}", is_sel)
                 if clicked:
                     sel_idx = i + 1
                     app._train_selected_model_idx = sel_idx
+                # Right-click: delete. Registry-only is the safe
+                # default; the artifacts variant shows the run dir size
+                # and refuses when another entry still references it.
+                if imgui.begin_popup_context_item(f"##model_ctx_{i}"):
+                    if m.status != "training":
+                        if imgui.menu_item("Delete entry (keep files)")[0]:
+                            registry.delete_model(active_project_id,
+                                                  m.model_id)
+                            if app._train_selected_model_idx > len(
+                                    registry.list_models(active_project_id)):
+                                app._train_selected_model_idx = 0
+                            if app.cli:
+                                app.cli.log(f"Deleted model entry "
+                                            f"'{m.name}'.", "info")
+                        _sz = registry.artifact_size(m.work_dir) \
+                            if m.work_dir else 0
+                        _sz_str = (f"{_sz / 1e9:.1f} GB" if _sz > 1e9
+                                   else f"{_sz / 1e6:.0f} MB")
+                        if _sz and imgui.menu_item(
+                                f"Delete entry + run dir ({_sz_str})")[0]:
+                            freed = registry.delete_model(
+                                active_project_id, m.model_id,
+                                delete_artifacts=True)
+                            if app._train_selected_model_idx > len(
+                                    registry.list_models(active_project_id)):
+                                app._train_selected_model_idx = 0
+                            if app.cli:
+                                if freed:
+                                    app.cli.log(
+                                        f"Deleted '{m.name}' + "
+                                        f"{freed / 1e6:.0f} MB of run "
+                                        f"artifacts.", "info")
+                                else:
+                                    app.cli.log(
+                                        f"Deleted '{m.name}' entry; run "
+                                        f"dir kept (shared or missing).",
+                                        "info")
+                    else:
+                        imgui.menu_item("(training — stop it first)",
+                                        "", False, False)
+                    imgui.end_popup()
                 imgui.unindent(th * 0.7)
             imgui.end_child()
             imgui.pop_style_color(1)
