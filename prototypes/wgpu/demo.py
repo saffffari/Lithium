@@ -296,7 +296,8 @@ def main():
         t_col = mk(wgpu.TextureFormat.rgba8unorm,
                    wgpu.TextureUsage.TEXTURE_BINDING)
         t_dep = mk(wgpu.TextureFormat.r32float,
-                   wgpu.TextureUsage.TEXTURE_BINDING)
+                   wgpu.TextureUsage.TEXTURE_BINDING
+                   | wgpu.TextureUsage.COPY_SRC)
         t_z = mk(wgpu.TextureFormat.depth24plus)
         t_fin = mk(wgpu.TextureFormat.rgba8unorm,
                    wgpu.TextureUsage.TEXTURE_BINDING
@@ -317,6 +318,50 @@ def main():
             entries=[{"binding": 0, "resource": {"buffer": ubo,
                                                  "offset": 0, "size": 80}}])
         state["tex"] = (t_col, t_dep, t_z, t_fin, bg_edl, bg_blit, bg_pts)
+
+    def pick_world_point(lx: float, ly: float):
+        """Depth-readback pick: logical click coords → world position.
+
+        Reads a 64-px strip of the linear-depth target around the click
+        (64*4 B satisfies the 256-B bytes_per_row alignment), then
+        unprojects eye + ray * depth. Returns None over background.
+        """
+        w, h = state["size"]
+        if state["tex"] is None or w == 0:
+            return None
+        lw, lh = canvas.get_logical_size()
+        px = int(lx * w / max(lw, 1))
+        py = int(ly * h / max(lh, 1))
+        if not (0 <= px < w and 0 <= py < h):
+            return None
+        x0 = min(max(px - 32, 0), max(w - 64, 0))
+        strip_w = min(64, w)
+        t_dep = state["tex"][1]
+        data = device.queue.read_texture(
+            {"texture": t_dep, "mip_level": 0, "origin": (x0, py, 0)},
+            {"offset": 0, "bytes_per_row": 256, "rows_per_image": 1},
+            (strip_w, 1, 1))
+        depths = np.frombuffer(bytes(data), dtype=np.float32)[:strip_w]
+        d = float(depths[min(px - x0, strip_w - 1)])
+        if d <= 0.0:
+            # background — try the nearest hit in the strip so a click
+            # just off a ridge still lands
+            hits = depths[depths > 0.0]
+            if hits.size == 0:
+                return None
+            d = float(hits.min())
+        eye = cam.eye()
+        fwd = cam.target - eye
+        fwd = fwd / np.linalg.norm(fwd)
+        right = np.cross(fwd, [0, 0, 1.0])
+        right = right / np.linalg.norm(right)
+        up = np.cross(right, fwd)
+        tanf = math.tan(math.radians(55) / 2)
+        ndc_x = 2.0 * (px + 0.5) / w - 1.0
+        ndc_y = 1.0 - 2.0 * (py + 0.5) / h
+        ray = fwd + tanf * (ndc_x * (w / h) * right + ndc_y * up)
+        ray = ray / np.linalg.norm(ray)
+        return eye + ray * d
 
     def save_screenshot():
         w, h = state["size"]
@@ -418,7 +463,15 @@ def main():
     def on_event(ev):
         et = ev["event_type"]
         cam.last_input = time.perf_counter()
-        if et == "pointer_down":
+        if et == "double_click":
+            hit = pick_world_point(ev["x"], ev["y"])
+            if hit is not None:
+                # Re-pivot: orbit target jumps to the clicked surface
+                # point; ease the dolly in a touch so the pivot change
+                # reads spatially.
+                cam.target = np.asarray(hit, dtype=np.float32)
+                cam.dist = max(cam.dist * 0.72, cam.span * 0.01)
+        elif et == "pointer_down":
             drag["btn"] = ev["button"]
             drag["x"], drag["y"] = ev["x"], ev["y"]
         elif et == "pointer_up":
@@ -454,7 +507,7 @@ def main():
 
     canvas.add_event_handler(
         on_event, "pointer_down", "pointer_up", "pointer_move",
-        "wheel", "key_down")
+        "wheel", "key_down", "double_click")
     canvas.request_draw(frame)
     loop.run()
 
