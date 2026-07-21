@@ -1910,9 +1910,27 @@ class App:
         """Load a directory as a time-series sequence."""
         print(f"Detected 4D sequence: {len(frame_paths)} frames")
         self.sequence = PointCloudSequence(frame_paths, cache_size=3)
-        # Load first frame into a single CloudEntry
+        # LS-1: register every frame with the catalog so each has a
+        # file_key — that's what routes per-stroke persistence, LRU
+        # eviction flush, and page-back-in label reload for sequence
+        # frames through the normal catalog label store. Without this
+        # the frame CloudEntry had no file_key and every persist
+        # silently no-oped, so painted labels died on eviction/exit.
+        self._ensure_catalog()
+        if self.catalog is not None:
+            lib_entries = self.catalog.register_files(frame_paths)
+            self.sequence.frame_keys = [
+                (le.file_key if le is not None else None)
+                for le in lib_entries
+            ]
+            self.sequence.persist_error_cb = (
+                lambda msg: self.set_status_banner(
+                    msg, level="error", source="sequence.persist_labels"))
+        # Load first frame into a single CloudEntry (this also re-applies
+        # any catalog labels persisted for frame 0 in a prior session).
         cloud = self.sequence.get_frame(0)
-        entry = CloudEntry(frame_paths[0])
+        entry = CloudEntry(frame_paths[0],
+                           file_key=self.sequence.frame_key(0))
         entry.bounds_min = cloud.bounds_min.copy()
         entry.bounds_max = cloud.bounds_max.copy()
         entry.point_count = cloud.point_count
@@ -4363,6 +4381,16 @@ class App:
                         save_preview_labels(file_key, prev)
             except Exception:
                 pass
+
+        # LS-1: flush labels for every LRU-cached sequence frame. The
+        # entries loop above only covers the frame currently on the GPU;
+        # the other cached frames (painted then scrubbed away from, or
+        # written by automation propagate) live only in sequence._cache.
+        if getattr(self, "sequence", None) is not None:
+            try:
+                self.sequence.flush_labels()
+            except Exception as e:
+                print(f"[cleanup] sequence label flush failed: {e}")
 
         # Restore cursor in case brush tool left it hidden
         try:
