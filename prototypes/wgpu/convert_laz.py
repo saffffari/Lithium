@@ -91,13 +91,18 @@ def main() -> int:
           f"(~{total // stride:,} kept)")
     print(f"bounds {mins} .. {maxs}")
 
-    # Elevation normalization from a probe of the first tile (2-98 pct
-    # of a subsample is stable enough across adjacent tiles).
-    with laspy.open(tiles[0]) as f:
-        probe = next(f.chunk_iterator(CHUNK))
-        z = np.asarray(probe.z, dtype=np.float32)
-    z_lo = float(np.percentile(z, 2))
-    z_hi = float(maxs[2])
+    # Elevation normalization from a probe across EVERY tile — a
+    # single-tile probe skews the ramp badly when the block spans
+    # coastal flats up into the hills.
+    probes = []
+    for t in tiles:
+        with laspy.open(t) as f:
+            chunk = next(f.chunk_iterator(1_000_000))
+            probes.append(np.asarray(chunk.z, dtype=np.float32))
+    zs = np.concatenate(probes)
+    z_lo = float(np.percentile(zs, 2))
+    z_hi = float(np.percentile(zs, 99))
+    del probes, zs
     print(f"elevation ramp {z_lo:.1f} .. {z_hi:.1f} m")
 
     out_bin = Path(args.out_prefix + ".bin")
@@ -118,15 +123,27 @@ def main() -> int:
                 z = np.asarray(pts.z[sl], dtype=np.float64)
                 inten = np.asarray(pts.intensity[sl], dtype=np.float32)
                 cls = np.asarray(pts.classification[sl], dtype=np.uint8)
+                # Drop noise returns: ASPRS 7 (low noise), 18 (high
+                # noise), and the withheld flag — they read as dark
+                # speckle punched into every surface under EDL.
+                keep = (cls != 7) & (cls != 18)
+                try:
+                    keep &= ~np.asarray(pts.withheld[sl], dtype=bool)
+                except AttributeError:
+                    pass
+                x, y, z = x[keep], y[keep], z[keep]
+                inten, cls = inten[keep], cls[keep]
                 n = len(x)
+                if n == 0:
+                    continue
 
                 tz = ((z - z_lo) / max(z_hi - z_lo, 1e-6)).astype(np.float32)
                 col = _ramp(tz)
                 # Intensity: log-scaled around its own median for local
                 # contrast; modulates brightness +-35%.
                 med = max(float(np.median(inten)), 1.0)
-                iv = np.clip(np.log1p(inten) / np.log1p(med * 4), 0.0, 1.3)
-                col *= (0.65 + 0.35 * iv)[:, None]
+                iv = np.clip(np.log1p(inten) / np.log1p(med * 4), 0.0, 1.2)
+                col *= (0.78 + 0.22 * iv)[:, None]
                 for cid, (tint, k) in _CLASS_TINT.items():
                     m = cls == cid
                     if m.any():

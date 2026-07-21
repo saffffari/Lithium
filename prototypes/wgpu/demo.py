@@ -115,9 +115,11 @@ fn fs_main(in: VSOut) -> @location(0) vec4<f32> {
         }
     }
     let shade = exp(-prm.strength * resp);
-    col = col * (0.25 + 0.75 * shade);
-    // gentle filmic-ish curve
-    col = col / (col + vec3<f32>(0.55)) * 1.55;
+    col = col * (0.12 + 0.88 * shade);
+    // mild contrast S-curve that keeps the palette instead of the old
+    // reinhard-lift that washed everything to cream
+    col = pow(clamp(col, vec3<f32>(0.0), vec3<f32>(1.0)),
+              vec3<f32>(0.88)) * 1.04;
     return vec4<f32>(col, 1.0);
 }
 """
@@ -173,9 +175,9 @@ class Orbit:
         self.target = (np.asarray(bounds_min) + np.asarray(bounds_max)) * 0.5
         span = float(np.linalg.norm(np.asarray(bounds_max)
                                     - np.asarray(bounds_min)))
-        self.dist = span * 0.55
+        self.dist = span * 0.38
         self.yaw = math.radians(35.0)
-        self.pitch = math.radians(38.0)
+        self.pitch = math.radians(26.0)
         self.span = span
         self.last_input = 0.0
 
@@ -279,7 +281,7 @@ def main():
                   "targets": [{"format": fmt}]},
     )
 
-    state = {"size": (0, 0), "tex": None, "edl": [1.0, 1.0],
+    state = {"size": (0, 0), "tex": None, "edl": [2.6, 1.0],
              "shot": False, "frames": 0, "t_fps": time.perf_counter(),
              "fps": 0.0, "total_frames": 0}
     cam = Orbit(meta["bounds_min"], meta["bounds_max"])
