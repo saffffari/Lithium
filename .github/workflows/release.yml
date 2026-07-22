@@ -1,0 +1,92 @@
+name: release
+
+# Tag vX.Y.Z -> build platform artifacts -> attach to a GitHub release.
+#   Linux:   single-file binary (Lithium-linux-x86_64)
+#   Windows: Lithium.exe + Inno Setup installer (LithiumSetup-<ver>.exe)
+#   macOS:   intentionally absent — the current renderer needs OpenGL
+#            4.3, which macOS never shipped. The WebGPU/Metal renderer
+#            (prototypes/wgpu -> src/render2) is the macOS path; add a
+#            macos job when it lands. See docs/handoff-macos.md.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch: {}
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: System GL/GLFW deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libglfw3 libgl1 libegl1 libxkbcommon0
+      - name: Install
+        run: |
+          python -m pip install -U pip
+          pip install -r requirements-lock.txt
+      - name: Tests
+        run: python -m pytest tests/ -q
+      - name: Build
+        run: pyinstaller lithium.spec --noconfirm
+      - name: Rename artifact
+        run: mv dist/Lithium dist/Lithium-linux-x86_64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Lithium-linux-x86_64
+          path: dist/Lithium-linux-x86_64
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: |
+          python -m pip install -U pip
+          pip install -r requirements-lock.txt
+      - name: Tests
+        run: python -m pytest tests/ -q
+      - name: Build exe
+        run: pyinstaller lithium.spec --noconfirm
+      - name: Version from tag
+        id: ver
+        shell: bash
+        run: echo "ver=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+      - name: Build installer (Inno Setup)
+        shell: cmd
+        run: |
+          "%ProgramFiles(x86)%\Inno Setup 6\iscc.exe" ^
+            /DAppVersion=${{ steps.ver.outputs.ver }} ^
+            packaging\lithium.iss
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Lithium-windows
+          path: |
+            dist/Lithium.exe
+            dist/LithiumSetup-*.exe
+
+  release:
+    needs: [linux, windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/Lithium-linux-x86_64
+            artifacts/Lithium.exe
+            artifacts/LithiumSetup-*.exe
+          draft: true
+          generate_release_notes: true
