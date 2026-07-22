@@ -26,7 +26,7 @@ be restored from ``library/backups/<timestamp>/`` if needed.
 
 Usage:
     python tools/predictions_to_project.py \\
-        --predictions D:/3Photon/dataset/training_runs/<run>/predictions \\
+        --predictions <dataset>/training_runs/<run>/predictions \\
         --project-id proj:5a770138
 """
 

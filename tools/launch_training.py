@@ -8,7 +8,7 @@ defaults (with auto class_weights), spawns the Pointcept subprocess via
 
 Usage:
     python tools/launch_training.py \\
-        --dataset D:/3Photon/dataset \\
+        --dataset <path-to-exported-dataset> \\
         --epochs 200
 """
 
@@ -48,7 +48,11 @@ def main():
     ap.add_argument("--run-name", default=None,
                     help="custom run dir name; default uses timestamp")
     ap.add_argument("--python-exe",
-                    default=r"C:/Users/alex/miniforge3/envs/3photon-ptv3/python.exe")
+                    default=os.environ.get("THREEPHOTON_TRAIN_PYTHON", ""),
+                    help="Python interpreter of the training env "
+                         "(conda env 3photon-ptv3). Falls back to the "
+                         "THREEPHOTON_TRAIN_PYTHON env var; required "
+                         "one way or the other.")
     ap.add_argument("--pointcept-dir", default=str(ROOT / "training" / "pointcept"))
     ap.add_argument("--pointcept-ext-dir",
                     default=str(ROOT / "src" / "training" / "pointcept_ext"))
@@ -71,6 +75,10 @@ def main():
                          "Z=up is preserved as a model cue. Right for "
                          "consistently-oriented supine CT data.")
     args = ap.parse_args()
+    if not args.python_exe:
+        ap.error("--python-exe (or THREEPHOTON_TRAIN_PYTHON) is required "
+                 "— point it at the training env's interpreter; see "
+                 "docs/training_setup.md")
 
     dataset = Path(args.dataset).resolve()
     classes_json = dataset / "classes.json"

@@ -14,10 +14,10 @@ import needed.
 
 Usage:
     python tools/predictions_to_ply.py \\
-        --dataset D:/3Photon/dataset \\
-        --predictions D:/3Photon/dataset/training_runs/<run>/predictions \\
+        --dataset <path-to-exported-dataset> \\
+        --predictions <dataset>/training_runs/<run>/predictions \\
         --split test \\
-        --output D:/3Photon/dataset/training_runs/<run>/predictions_ply
+        --output <dataset>/training_runs/<run>/predictions_ply
 """
 
 import argparse

@@ -75,7 +75,7 @@ def helix(n=50000):
 
 
 if __name__ == '__main__':
-    out = 'D:/3Photon/data/test_gallery'
+    out = 'test_gallery'
     print(f"Generating test set in {out}/")
     os.makedirs(out, exist_ok=True)
 
