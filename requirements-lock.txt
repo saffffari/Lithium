@@ -1,0 +1,17 @@
+dracopy==2.0.0
+glfw==2.10.1
+h5py==3.16.0
+imgui==2.0.0
+laspy==2.7.0
+lazrs==0.8.1
+moderngl==5.12.0
+numpy==2.5.1
+pillow==12.3.0
+plyfile==1.1.4
+pygltflib==1.16.5
+pyinstaller==6.21.0
+pyinstaller-hooks-contrib==2026.6
+rendercanvas==2.7.1
+scipy==1.18.0
+trimesh==4.12.2
+wgpu==0.32.0

@@ -1,7 +1,7 @@
 @echo off
-echo Building 3Photon...
+echo Building Lithium...
 call .venv\Scripts\activate
-pyinstaller 3photon.spec --noconfirm
+pyinstaller lithium.spec --noconfirm
 echo.
-echo Build complete. Executable at: dist\3Photon.exe
+echo Build complete. Executable at: dist\Lithium.exe
 pause

@@ -11,18 +11,18 @@ read -r -d '' ENTRY <<EOF || true
 [Desktop Entry]
 Type=Application
 Version=1.0
-Name=3Photon
+Name=Lithium
 GenericName=Point Cloud Workstation
-Comment=Visualize, annotate, and train on point clouds
+Comment=Point cloud workstation — visualize, annotate, train. A 2Photon Element.
 Exec=$REPO/run.sh %F
-Icon=$REPO/assets/3photon.png
+Icon=$REPO/assets/lithium.png
 Terminal=false
 Categories=Graphics;3DGraphics;
 StartupNotify=true
-StartupWMClass=3 P H O T O N
+StartupWMClass=lithium
 EOF
 
-DEST="$APPS/3photon.desktop"
+DEST="$APPS/lithium.desktop"
 printf '%s\n' "$ENTRY" > "$DEST"
 chmod +x "$DEST"
 echo "installed: $DEST"

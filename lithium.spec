@@ -14,7 +14,7 @@ glfw_binaries = collect_dynamic_libs("glfw")
 gl_platform = "OpenGL.platform.win32" if IS_WIN else "OpenGL.platform.glx"
 
 # .ico is Windows-only; Linux builds ship without an embedded icon.
-app_icon = "assets/3photon.ico" if IS_WIN else None
+app_icon = "assets/lithium.ico" if IS_WIN else None
 
 a = Analysis(
     ['src/main.py'],
@@ -47,7 +47,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='3Photon',
+    name='Lithium',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

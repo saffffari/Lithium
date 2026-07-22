@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 3Photon launcher (Linux/macOS). Uses this repo's .venv python and runs
+# Lithium launcher (Linux/macOS). Uses this repo's .venv python and runs
 # from the repo root so `src` resolves; works for worktrees too (each
 # worktree's own run.sh resolves its own root).
 set -euo pipefail

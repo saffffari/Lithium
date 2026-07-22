@@ -647,9 +647,16 @@ class App:
             glfw.window_hint(glfw.SCALE_FRAMEBUFFER, True)
         if hasattr(glfw, "SCALE_TO_MONITOR"):
             glfw.window_hint(glfw.SCALE_TO_MONITOR, True)
+        # App identity for the compositor/WM: matches lithium.desktop so
+        # taskbar pinning + icon association resolve on Wayland and X11.
         if hasattr(glfw, "WAYLAND_APP_ID"):
             try:
-                glfw.window_hint_string(glfw.WAYLAND_APP_ID, "3photon")
+                glfw.window_hint_string(glfw.WAYLAND_APP_ID, "lithium")
+            except Exception:
+                pass
+        if hasattr(glfw, "X11_CLASS_NAME"):
+            try:
+                glfw.window_hint_string(glfw.X11_CLASS_NAME, "lithium")
             except Exception:
                 pass
 
@@ -670,7 +677,7 @@ class App:
         glfw.window_hint(glfw.MAXIMIZED, True)
 
         self.window = glfw.create_window(mode.size.width, mode.size.height,
-                                         "3 P H O T O N", None, None)
+                                         "L I T H I U M", None, None)
         if not self.window:
             glfw.terminate()
             raise RuntimeError("Failed to create GLFW window")
@@ -4439,10 +4446,10 @@ class App:
             from PIL import Image
             icon_path = os.path.join(
                 os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                'assets', '3photon.png'
+                'assets', 'lithium.png'
             )
             if getattr(sys, 'frozen', False):
-                icon_path = os.path.join(sys._MEIPASS, 'assets', '3photon.png')
+                icon_path = os.path.join(sys._MEIPASS, 'assets', 'lithium.png')
             if os.path.exists(icon_path):
                 img = Image.open(icon_path).convert('RGBA')
                 # Supply multiple sizes so the OS picks the best fit for
@@ -4469,7 +4476,7 @@ class App:
             pending_str = f" | {pending} loading" if pending > 0 else ""
             glfw.set_window_title(
                 self.window,
-                f"3 P H O T O N  —  {mode_str}  |  {self.fps:.0f} fps  |  {pts:,} pts{pending_str}"
+                f"L I T H I U M  —  {mode_str}  |  {self.fps:.0f} fps  |  {pts:,} pts{pending_str}"
             )
             self._fps_frame_count = 0
             self.last_fps_time = now

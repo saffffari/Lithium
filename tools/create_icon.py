@@ -40,13 +40,13 @@ def create_icon():
     out_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'assets')
     os.makedirs(out_dir, exist_ok=True)
 
-    ico_path = os.path.join(out_dir, '3photon.ico')
+    ico_path = os.path.join(out_dir, 'lithium.ico')
     icons[0].save(ico_path, format='ICO', sizes=[(s, s) for s in sizes],
                   append_images=icons[1:])
     print(f"Created: {ico_path}")
 
     # Also save a 256px PNG
-    png_path = os.path.join(out_dir, '3photon.png')
+    png_path = os.path.join(out_dir, 'lithium.png')
     icons[0].save(png_path)
     print(f"Created: {png_path}")
 
