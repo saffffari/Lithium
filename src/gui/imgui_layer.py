@@ -104,9 +104,19 @@ class ImGuiLayer:
         # Get DPI scale before creating renderer
         dpi = init_scale(window)
 
-        # Load fonts at native DPI size (not the default 13px bitmap)
+        self._build_fonts(dpi)
+
+        self.impl = GlfwRenderer(window, attach_callbacks=False)
+        self.window = window
+        self.visible = True
+
+        _apply_dark_flat_style()
+
+    def _build_fonts(self, dpi: float) -> None:
+        """(Re)build the font atlas at the given DPI scale."""
         io = imgui.get_io()
         io.fonts.clear()
+        io.font_global_scale = 1.0
 
         # 1. UI font — compact, for general text
         font_path = self._find_system_font()
@@ -125,10 +135,24 @@ class ImGuiLayer:
         else:
             self.font_display = None
 
-        self.impl = GlfwRenderer(window, attach_callbacks=False)
-        self.window = window
-        self.visible = True
+    def rebuild_for_scale(self, new_dpi: float) -> None:
+        """Rescale the whole GUI for a monitor change (live, per-frame safe
+        when called OUTSIDE an imgui frame).
 
+        The scale used to be frozen at window creation, so dragging the
+        window from the studio display to the mini (different content
+        scales) left every font and padding sized for the wrong
+        monitor. Rebuilds the font atlas at the new size, re-uploads
+        the texture, and re-applies the style block (its paddings are
+        baked in scaled pixels).
+        """
+        from src.gui import scale as _scale
+        _scale.set_scale(new_dpi)
+        self._build_fonts(new_dpi)
+        self.impl.refresh_font_texture()
+        # Style paddings/rounding are absolute values computed from the
+        # scale at apply time — reset to defaults isn't needed since
+        # _apply_dark_flat_style writes every field it touches.
         _apply_dark_flat_style()
 
     def _find_system_font(self) -> str | None:

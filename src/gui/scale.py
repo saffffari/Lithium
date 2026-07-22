@@ -37,6 +37,13 @@ def init_scale(window) -> float:
     return _dpi_scale
 
 
+def set_scale(value: float) -> float:
+    """Explicitly set the cached scale (monitor-change rescale path)."""
+    global _dpi_scale
+    _dpi_scale = max(float(value), 0.5)
+    return _dpi_scale
+
+
 def get_scale() -> float:
     """Get the current DPI scale factor."""
     return _dpi_scale

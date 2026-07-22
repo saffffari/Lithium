@@ -687,6 +687,7 @@ class App:
         # Force dark title bar on Windows via DWM
         self._apply_dark_title_bar()
 
+        self._pending_content_scale: float | None = None
         glfw.set_framebuffer_size_callback(self.window, self._on_resize)
         glfw.set_mouse_button_callback(self.window, self._on_mouse_button)
         glfw.set_cursor_pos_callback(self.window, self._on_mouse_move)
@@ -695,6 +696,13 @@ class App:
         glfw.set_char_callback(self.window, self._on_char)
         glfw.set_drop_callback(self.window, self._on_drop)
         glfw.set_window_focus_callback(self.window, self._on_focus)
+        # Live DPI rescale on monitor change: the compositor updates the
+        # window's content scale when it moves between displays with
+        # different scale factors (studio vs mini). The callback only
+        # records the value — the font-atlas rebuild happens on the
+        # frame loop, never mid-imgui-frame.
+        glfw.set_window_content_scale_callback(
+            self.window, self._on_content_scale)
 
         # Standard cursors for selection tools (see _update_tool_cursor)
         try:
@@ -2403,6 +2411,18 @@ class App:
                     # the next one — up to two frames of input-to-pixel
                     # latency. Polling first closes that gap to one frame.
                     glfw.poll_events()
+
+                    # Monitor-change DPI rescale: applied here, between
+                    # frames, never from the GLFW callback (mid-frame
+                    # font-atlas rebuilds corrupt ImGui state).
+                    if self._pending_content_scale is not None:
+                        _new_scale = self._pending_content_scale
+                        self._pending_content_scale = None
+                        from src.gui.scale import get_scale
+                        if abs(_new_scale - get_scale()) > 0.01 \
+                                and self.gui is not None:
+                            self.gui.rebuild_for_scale(_new_scale)
+                            self._overlays_dirty = True
 
                     # Frame-rate-independent delta time, clamped so a hitched frame
                     # never teleports smoothed values.
@@ -6078,6 +6098,10 @@ class App:
         # Clamp scroll_y in case the new viewport is taller than the old.
         if getattr(self, '_gallery_scroll_y', None) is not None:
             self._gallery_scroll_y = max(0.0, float(self._gallery_scroll_y))
+
+    def _on_content_scale(self, window, sx, sy):
+        """Record a monitor scale change; the frame loop applies it."""
+        self._pending_content_scale = max(sx, sy, 0.5)
 
     def _on_focus(self, window, focused):
         """Reset all drag states when the window loses focus.
