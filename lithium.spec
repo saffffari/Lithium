@@ -10,8 +10,20 @@ IS_WIN = sys.platform == "win32"
 # hardcoded path.
 glfw_binaries = collect_dynamic_libs("glfw")
 
-# OpenGL's platform backend differs by OS.
-gl_platform = "OpenGL.platform.win32" if IS_WIN else "OpenGL.platform.glx"
+# OpenGL's platform backend is chosen dynamically at runtime — bundle
+# every candidate for the OS (Linux picks glx under X11, egl under
+# Wayland), plus the array-format helpers PyOpenGL lazy-imports.
+if IS_WIN:
+    gl_platforms = ["OpenGL.platform.win32"]
+else:
+    gl_platforms = ["OpenGL.platform.glx", "OpenGL.platform.egl",
+                    "OpenGL.platform.osmesa"]
+gl_arrays = [
+    "OpenGL.arrays.ctypesarrays", "OpenGL.arrays.ctypesparameters",
+    "OpenGL.arrays.ctypespointers", "OpenGL.arrays.lists",
+    "OpenGL.arrays.numbers", "OpenGL.arrays.numpymodule",
+    "OpenGL.arrays.strings", "OpenGL.arrays.nones",
+]
 
 # .ico is Windows-only; Linux builds ship without an embedded icon.
 app_icon = "assets/lithium.ico" if IS_WIN else None
@@ -27,7 +39,7 @@ a = Analysis(
     hiddenimports=[
         'glfw', 'moderngl', 'glcontext',
         'imgui', 'imgui.integrations', 'imgui.integrations.glfw',
-        'OpenGL', 'OpenGL.GL', 'OpenGL.platform', gl_platform,
+        'OpenGL', 'OpenGL.GL', 'OpenGL.platform', *gl_platforms, *gl_arrays,
         'laspy', 'lazrs', 'plyfile',
         'PIL', 'PIL.Image',
         'numpy', 'scipy', 'scipy.spatial',
