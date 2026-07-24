@@ -3901,6 +3901,10 @@ class App:
 
         try:
             mx, my = glfw.get_cursor_pos(window)
+            # Gallery layout math lives in framebuffer pixels; the
+            # cursor arrives in window-logical coords (differs under
+            # fractional scaling).
+            mx, my = self._window_to_fb(mx, my)
         except Exception:
             mx, my = 0.0, 0.0
 
@@ -6049,8 +6053,9 @@ class App:
         if (time.perf_counter() - self._rmb_press_time) < _RADIAL_MENU_DELAY:
             return
 
-        # Open the menu at the press location.
-        mx, my = glfw.get_cursor_pos(self.window)
+        # Open the menu at the press location. ImGui draws in
+        # framebuffer space — convert the logical cursor.
+        mx, my = self._window_to_fb(*glfw.get_cursor_pos(self.window))
         self._radial_menu_active = True
         self._radial_menu_center = (mx, my)
         self._radial_menu_selected = -1
@@ -6296,6 +6301,9 @@ class App:
             # resizes cells (handled in _on_scroll).
             ready_pairs = self._gallery_filter_ready_cached()
             ready = [e for _, e in ready_pairs]
+            # Gallery layout is framebuffer-space; the cursor is
+            # window-logical. Convert once for every hit-test below.
+            mx, my = self._window_to_fb(mx, my)
             sw = self._left_chrome_width()
             menu_h = int(getattr(self, '_menu_bar_height', 0))
             area_w = max(self.width - sw, 1)
@@ -6495,7 +6503,8 @@ class App:
         if self._gallery_scrollbar_dragging:
             menu_h = int(getattr(self, '_menu_bar_height', 0))
             area_h = max(self.height - menu_h, 1)
-            self._scrollbar_drag_to(y, area_h)
+            _fx, _fy = self._window_to_fb(x, y)
+            self._scrollbar_drag_to(_fy, area_h)
             self.camera.set_mouse_pos(x, y)
             return
 
@@ -6505,7 +6514,8 @@ class App:
         if self._radial_menu_active and self._radial_menu_center is not None:
             from src.gui.radial_menu import slice_from_cursor
             cx, cy = self._radial_menu_center
-            self._radial_menu_selected = slice_from_cursor(cx, cy, x, y)
+            _fx, _fy = self._window_to_fb(x, y)
+            self._radial_menu_selected = slice_from_cursor(cx, cy, _fx, _fy)
             self.camera.set_mouse_pos(x, y)
             return
 

@@ -223,9 +223,9 @@ def draw_settings_panel(app) -> bool:
 
     # Record the sidebar's actual right edge in FRAMEBUFFER pixels so the
     # GL gallery (which renders in framebuffer space) starts exactly where
-    # the sidebar ends. imgui lays out in logical/display units, so convert
-    # via display_fb_scale — at fractional DPI the logical width differs
-    # from the framebuffer width the gallery viewport uses.
+    # the sidebar ends. Since the ImGuiLayer unified ImGui into framebuffer
+    # space, display_fb_scale is 1.0 and this is a pass-through — kept so
+    # a future backend with a real logical/fb split still lands here.
     try:
         _fbx = imgui.get_io().display_fb_scale[0] or 1.0
         _right = imgui.get_window_position()[0] + imgui.get_window_size()[0]

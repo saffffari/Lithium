@@ -1,5 +1,7 @@
 """ImGui initialization, frame management, and GLFW integration."""
 
+import sys
+
 import glfw
 import imgui
 from imgui.integrations.glfw import GlfwRenderer
@@ -201,6 +203,26 @@ class ImGuiLayer:
 
     def new_frame(self):
         self.impl.process_inputs()
+        # Unify ImGui into FRAMEBUFFER space. The stock GlfwRenderer
+        # runs ImGui in window-logical coords with display_fb_scale
+        # doing the stretch at render time — which (a) upscales the
+        # font atlas on fractional-scale monitors (blurry text) and
+        # (b) disagrees by the scale factor with every piece of app
+        # math done in framebuffer pixels (self.width/height, the GL
+        # gallery, selection rects). One space for everything instead:
+        # display_size = framebuffer, fb_scale = 1, mouse scaled up.
+        io = imgui.get_io()
+        try:
+            fbw, fbh = glfw.get_framebuffer_size(self.window)
+            ww, wh = glfw.get_window_size(self.window)
+            if fbw > 0 and fbh > 0 and ww > 0 and wh > 0:
+                io.display_size = (fbw, fbh)
+                io.display_fb_scale = (1.0, 1.0)
+                mx, my = io.mouse_pos
+                if mx > -sys.float_info.max / 2:  # imgui's "no mouse" sentinel
+                    io.mouse_pos = (mx * fbw / ww, my * fbh / wh)
+        except Exception:
+            pass
         imgui.new_frame()
 
     def render(self):
