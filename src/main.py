@@ -582,6 +582,9 @@ class App:
         self.brightness = float(prefs.get("brightness", self.brightness))
         self.contrast = float(prefs.get("contrast", self.contrast))
         self.saturation = float(prefs.get("saturation", self.saturation))
+        # SSAO on point splats gives every big disc a dark halo at close zoom
+        # (the "fuzzy" look) — off by default, persisted, F6 toggles.
+        self.ssao_enabled = bool(prefs.get("ssao_enabled", False))
         self.r_gain = float(prefs.get("r_gain", self.r_gain))
         self.g_gain = float(prefs.get("g_gain", self.g_gain))
         self.b_gain = float(prefs.get("b_gain", self.b_gain))
@@ -848,7 +851,7 @@ class App:
             'power':    1.9,    # exponent applied to AO factor
             'strength': 0.8,    # 0 = no AO, 1 = full
         }
-        self.ssao_enabled = True
+        self.ssao_enabled = bool(getattr(self, "ssao_enabled", False))
 
         # === Selection-outline pipeline =============================
         # When a vertebra is selected in HOLOGRAM we want a 2-pixel
@@ -1235,6 +1238,7 @@ class App:
             'b_gain': float(self.b_gain),
             'label_blend': float(self.label_blend),
             'exposure': float(self.exposure),
+            'ssao_enabled': bool(self.ssao_enabled),
         })
 
     def _persist_cloud_labels(self, entry, cloud) -> None:
@@ -6845,6 +6849,7 @@ class App:
             # 1×1 white sentinel, so no shader recompile.
             self.ssao_enabled = not self.ssao_enabled
             print(f"[ssao] {'on' if self.ssao_enabled else 'off'}")
+            self._save_view_prefs()
         elif key == glfw.KEY_H and not (mods & glfw.MOD_SHIFT):
             # H is context-dependent. In LIGHT TABLE it toggles
             # visibility of the *active label* so the user can hide
