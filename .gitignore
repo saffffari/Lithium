@@ -96,3 +96,6 @@ node_modules/
 /paper/arxiv/
 /paper/arxiv_verify/
 /paper/lithium_arxiv.tar.gz
+
+# Built pitch page (regenerate with scripts/pitch_build.py; published as an Artifact)
+/docs/pitch/lithium_pitch.html

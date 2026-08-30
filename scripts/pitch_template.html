@@ -1,0 +1,352 @@
+<title>Lithium Light Table Pitch</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{color-scheme:dark;--bg:#0f0f0f;--panel:#171717;--panel2:#1d1d1d;--line:#2a2a2a;--ink:#f2f2f2;--dim:#8a8a8a;--dimmer:#5a5a5a;
+--acc:#f99224;--acc-soft:rgba(249,146,36,.14);--blue:#638bff;--green:#00ed95;--red:#ff395d;
+--sup:#d65e00;--inf:#0073b2;--ped:#57e87e;--viol:#b48cff;--lred:#ff5c5c;
+--ui:"Archivo","Helvetica Neue",Arial,sans-serif;--mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--ui);font-size:15px;line-height:1.45;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+button:focus-visible,a:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+a{color:var(--ink)}
+.app{display:grid;grid-template-rows:38px 1fr;height:100vh;min-height:640px}
+.titlebar{display:flex;align-items:center;justify-content:space-between;padding:0 16px;border-bottom:1px solid var(--line);background:#0b0b0b;font-family:var(--mono);font-size:12.5px;letter-spacing:.06em}
+.titlebar .brand{font-weight:500;letter-spacing:.42em}
+.titlebar .brand b{font-weight:500;color:var(--acc)}
+.titlebar .meta{color:var(--dim)}
+.titlebar .meta i{color:var(--green);font-style:normal}
+.frame{display:grid;grid-template-columns:236px 1fr;min-height:0}
+.rail{border-right:1px solid var(--line);background:var(--panel);padding:14px 10px;display:flex;flex-direction:column;gap:6px;overflow:auto}
+.rail .who{padding:6px 8px 12px;border-bottom:1px solid var(--line);margin-bottom:6px}
+.rail .who .li{font-family:var(--mono);font-size:30px;letter-spacing:.1em;line-height:1;color:var(--ink)}
+.rail .who .li span{color:var(--acc)}
+.rail .who small{display:block;color:var(--dim);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;margin-top:8px}
+.nav{display:grid;grid-template-columns:14px 1fr auto;gap:8px 10px;align-items:baseline;text-align:left;padding:9px 10px;border-radius:4px;color:var(--dim)}
+.nav .sq{width:8px;height:8px;background:currentColor;display:inline-block;transform:translateY(-1px)}
+.nav .t{font-weight:600;letter-spacing:.12em;font-size:12.5px;text-transform:uppercase;color:var(--ink)}
+.nav .s{grid-column:2;font-size:12.5px;color:var(--dim)}
+.nav .k{font-family:var(--mono);font-size:11px;color:var(--dimmer)}
+.nav:hover{background:var(--panel2)}
+.nav.active{background:var(--acc-soft);color:var(--acc)}
+.nav.active .t{color:var(--acc)}
+.rail .foot{margin-top:auto;padding:10px 8px 0;border-top:1px solid var(--line);font-size:11.5px;color:var(--dim);line-height:1.5}
+.rail .foot a{color:var(--dim)}
+.main{position:relative;overflow:auto;min-width:0}
+.sec{display:none;padding:26px 34px 40px;max-width:1240px}
+.sec.active{display:block}
+.eyebrow{font-size:11.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--acc);display:flex;align-items:center;gap:8px;margin:0 0 10px}
+.eyebrow::before{content:"";width:8px;height:8px;background:var(--acc)}
+h1{font-size:34px;line-height:1.12;font-weight:600;letter-spacing:-.01em;margin:0 0 10px;max-width:22ch;text-wrap:balance}
+h2{font-size:15px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin:28px 0 12px}
+p.lede{font-size:17px;color:#cfcfcf;max-width:62ch;margin:0 0 20px}
+p{max-width:65ch}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:22px 0}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px 16px}
+.stat .v{font-family:var(--mono);font-size:30px;line-height:1;color:var(--ink);font-variant-numeric:tabular-nums}
+.stat .v em{font-style:normal;color:var(--acc)}
+.stat .l{color:var(--dim);font-size:12.5px;margin-top:8px;letter-spacing:.04em}
+.shots{display:grid;grid-template-columns:1fr 240px;gap:14px;align-items:start}
+.shot-main{background:#000;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.shot-main img{display:block;width:100%;height:auto}
+.shot-main .cap{padding:10px 14px;font-size:13px;color:var(--dim);border-top:1px solid var(--line);background:var(--panel)}
+.shot-main .cap b{color:var(--ink);font-weight:600;letter-spacing:.08em}
+.thumbs{display:flex;flex-direction:column;gap:8px}
+.thumb{display:grid;grid-template-columns:86px 1fr;gap:10px;align-items:center;padding:6px;border:1px solid var(--line);border-radius:6px;background:var(--panel);text-align:left;color:var(--dim)}
+.thumb img{width:86px;height:48px;object-fit:cover;border-radius:3px;display:block}
+.thumb b{display:block;color:var(--ink);font-size:12.5px;letter-spacing:.1em}
+.thumb span{font-size:12px}
+.thumb.active{border-color:var(--acc);color:var(--ink)}
+.viewer{display:grid;grid-template-columns:1fr 292px;gap:14px;align-items:stretch}
+.canvas-wrap{position:relative;background:#050505;border:1px solid var(--line);border-radius:6px;overflow:hidden;min-height:520px}
+canvas.gl{width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+canvas.gl:active{cursor:grabbing}
+.hud{position:absolute;left:12px;bottom:10px;font-family:var(--mono);font-size:11.5px;color:var(--dim);pointer-events:none}
+.hud b{color:var(--ink);font-weight:500}
+.hud .lg{display:flex;gap:14px;margin-top:6px}
+.hud .lg i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+.ctl{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 12px}
+.ctl .grp{display:flex;gap:4px;background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:3px}
+.ctl .lab{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--dimmer);margin:0 6px 0 4px}
+.b{padding:6px 11px;border-radius:3px;font-size:12.5px;font-weight:500;color:var(--dim);letter-spacing:.03em}
+.b:hover{color:var(--ink)}
+.b.on{background:var(--acc);color:#111}
+.b.chip{display:inline-flex;align-items:center;gap:6px}
+.b.chip i{width:9px;height:9px;border-radius:50%;display:inline-block;opacity:.35}
+.b.chip.on{background:#2a2a2a;color:var(--ink)}
+.b.chip.on i{opacity:1}
+.readout{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px 16px;font-family:var(--mono);font-size:12.5px;display:flex;flex-direction:column;gap:12px}
+.readout h3{margin:0;font-family:var(--ui);font-size:11.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--acc);font-weight:600}
+.readout .row{display:flex;justify-content:space-between;gap:10px;color:var(--dim);font-variant-numeric:tabular-nums}
+.readout .row b{color:var(--ink);font-weight:500}
+.readout .row .ok{color:var(--green)}
+.readout .row .warn{color:var(--acc)}
+.readout .row .bad{color:var(--red)}
+.readout hr{border:0;border-top:1px solid var(--line);margin:2px 0}
+.readout .note{font-family:var(--ui);font-size:12px;color:var(--dim);line-height:1.45}
+.readout table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+.readout th{font-weight:500;color:var(--dimmer);text-align:right;font-size:11px;padding:2px 0}
+.readout th:first-child,.readout td:first-child{text-align:left;color:var(--dim)}
+.readout td{text-align:right;padding:3px 0;color:var(--ink)}
+.figs{display:grid;grid-template-columns:1fr;gap:16px}
+.fig{background:#fff;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.fig img{display:block;width:100%;height:auto}
+.fig .cap{background:var(--panel);color:var(--dim);font-size:13px;padding:10px 14px;border-top:1px solid var(--line)}
+.callouts{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:18px 0}
+.co{border:1px solid var(--line);border-left:3px solid var(--acc);background:var(--panel);border-radius:0 6px 6px 0;padding:14px 16px}
+.co.g{border-left-color:var(--green)} .co.r{border-left-color:var(--red)} .co.b{border-left-color:var(--blue)}
+.co .v{font-family:var(--mono);font-size:26px;line-height:1.05;font-variant-numeric:tabular-nums}
+.co .t{font-weight:600;margin-top:6px}
+.co .d{color:var(--dim);font-size:13px;margin-top:4px}
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:18px 18px 16px;display:flex;flex-direction:column;gap:8px}
+.card .n{font-family:var(--mono);font-size:11.5px;color:var(--acc);letter-spacing:.1em}
+.card h4{margin:0;font-size:17px;font-weight:600;letter-spacing:-.005em;text-wrap:balance}
+.card p{margin:0;color:#cfcfcf;font-size:14px}
+.card .src{color:var(--dimmer);font-size:12px;margin-top:auto;padding-top:6px}
+.ask{display:flex;flex-direction:column;gap:10px;max-width:880px}
+.ask .row{display:grid;grid-template-columns:46px 1fr auto;gap:14px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px 16px}
+.ask .row .k{font-family:var(--mono);color:var(--acc);font-size:20px}
+.ask .row h4{margin:0 0 3px;font-size:16px;font-weight:600}
+.ask .row p{margin:0;color:var(--dim);font-size:13.5px}
+.ask .row .time{font-family:var(--mono);font-size:12px;color:var(--ink);background:#2a2a2a;padding:5px 9px;border-radius:3px;white-space:nowrap}
+.close{margin-top:26px;padding:18px 20px;border:1px solid var(--line);border-radius:6px;background:var(--acc-soft);max-width:880px}
+.close p{margin:0;font-size:16px;color:var(--ink);max-width:70ch}
+.kbd{font-family:var(--mono);font-size:11px;color:var(--dimmer);border:1px solid var(--line);border-radius:3px;padding:1px 5px}
+.ledger{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:8px}
+.ledger div{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:12px 14px;font-size:13px;color:var(--dim)}
+.ledger b{display:block;color:var(--ink);font-weight:600;margin-bottom:4px}
+@media (max-width:980px){.frame{grid-template-columns:1fr}.rail{flex-direction:row;flex-wrap:wrap;gap:4px;padding:8px}.rail .who,.rail .foot{display:none}.nav{padding:8px 10px}.nav .s,.nav .k{display:none}
+.viewer{grid-template-columns:1fr}.stats,.callouts,.cards,.ledger{grid-template-columns:1fr 1fr}.shots{grid-template-columns:1fr}.thumbs{flex-direction:row}.sec{padding:18px}}
+@media (max-width:600px){.stats,.callouts,.cards,.ledger{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:reduce){.sec{transition:none}}
+</style>
+
+<div class="app">
+  <div class="titlebar">
+    <div class="brand">L I T H I U M <b>—</b> <span id="tb-title">Contact Sheets</span></div>
+    <div class="meta">for Dr. Skaggs · Cedars-Sinai Spine &nbsp;|&nbsp; <i>{{N.clouds}}</i> clouds &nbsp;|&nbsp; <i>{{N.models}}</i> models</div>
+  </div>
+  <div class="frame">
+    <nav class="rail" aria-label="Sections">
+      <div class="who"><div class="li">L<span>i</span></div><small>Light Table for anatomy</small></div>
+      <button class="nav active" data-sec="sheets"><span class="sq"></span><span class="t">Sheets</span><span class="k">1</span><span class="s">What it is</span></button>
+      <button class="nav" data-sec="light"><span class="sq"></span><span class="t">Light</span><span class="k">2</span><span class="s">The idea, live</span></button>
+      <button class="nav" data-sec="train"><span class="sq"></span><span class="t">Train</span><span class="k">3</span><span class="s">What it produces</span></button>
+      <button class="nav" data-sec="why"><span class="sq"></span><span class="t">Why you</span><span class="k">4</span><span class="s">A surgeon's tool</span></button>
+      <button class="nav" data-sec="ask"><span class="sq"></span><span class="t">The ask</span><span class="k">5</span><span class="s">Four things</span></button>
+      <div class="foot">Open source (MIT) · <a href="https://github.com/saffffari/Lithium">github.com/saffffari/Lithium</a><br>Manuscript drafted for arXiv · Gold247 dataset CC BY-SA 4.0</div>
+    </nav>
+    <main class="main">
+
+      <section class="sec active" id="sec-sheets">
+        <p class="eyebrow">Sheets · what it is</p>
+        <h1>A workstation that labels anatomy on the surface and trains the model in the same window.</h1>
+        <p class="lede">Lithium takes a CT-derived vertebra as a point cloud, lets you paint endplates, pedicles and processes directly on it, trains a Point Transformer on those labels, and runs the model back on the next bone. One app, one workstation, no cloud.</p>
+        <div class="stats">
+          <div class="stat"><div class="v">{{N.bones}}</div><div class="l">hand-labelled VerSe vertebrae ({{N.subjects}} subjects), the Gold247 set</div></div>
+          <div class="stat"><div class="v">{{N.pts}}</div><div class="l">surface points per bone instead of ~500k voxels</div></div>
+          <div class="stat"><div class="v"><em>{{N.sup}}</em> / {{N.inf_}}</div><div class="l">endplate precision on held-out subjects</div></div>
+          <div class="stat"><div class="v">{{N.infer}} s</div><div class="l">to run the model on a bone ({{N.gpu}})</div></div>
+        </div>
+        <div class="shots">
+          <div class="shot-main"><img id="shot-img" src="{{IMG.light}}" alt="Lithium Light Table with a hand-labelled L1"><div class="cap" id="shot-cap"><b>LIGHT TABLE</b> — paint per-point labels with pick, box, lasso, polygon, brush and curve; INFER runs the project's model on this cloud; every stroke is saved and undoable.</div></div>
+          <div class="thumbs">
+            <button class="thumb active" data-shot="light"><img src="{{IMG.light}}" alt=""><span><b>LIGHT TABLE</b><span>label a bone</span></span></button>
+            <button class="thumb" data-shot="sheets"><img src="{{IMG.sheets}}" alt=""><span><b>SHEETS</b><span>catalog · projects · gallery</span></span></button>
+            <button class="thumb" data-shot="train"><img src="{{IMG.train}}" alt=""><span><b>TRAIN</b><span>dataset · PT-v3 · models</span></span></button>
+          </div>
+        </div>
+        <h2>In the catalog right now</h2>
+        <div class="ledger">
+          <div><b>{{N.clouds}} clouds · {{N.projects}} projects · {{N.models}} models</b>the catalog <em>is</em> the dataset — every label persisted, per project, per bone</div>
+          <div><b>Gold247: {{N.train}} / {{N.val}} / {{N.test}}</b>train / val / test split by <em>subject</em>, so no held-out patient's vertebra is ever seen in training</div>
+          <div><b>15,000 bones in flight</b>the next cohort, pre-labelled by the Sonata model on the HPC, lands in Lithium for correction</div>
+        </div>
+      </section>
+
+      <section class="sec" id="sec-light">
+        <p class="eyebrow">Light table · the idea, live</p>
+        <h1>Anatomy is a surface. Label it there, and the frame falls out.</h1>
+        <p class="lede">Two adjacent held-out vertebrae, exactly as the model saw them. Drag to rotate. Switch between the hand labels and what the model predicted; the vertebral frame (S, P, L) is computed live from whichever labels are showing, and the disc angle between the two bones is read straight off those frames.</p>
+        <div class="ctl">
+          <div class="grp"><span class="lab">labels</span><button class="b on" data-mode="gt">Hand</button><button class="b" data-mode="pred">Sonata</button><button class="b" data-mode="err">Errors</button></div>
+          <div class="grp"><span class="lab">show</span><button class="b chip on" data-cls="1"><i style="background:var(--sup)"></i>sup. endplate</button><button class="b chip on" data-cls="2"><i style="background:var(--inf)"></i>inf. endplate</button><button class="b chip on" data-cls="3"><i style="background:var(--ped)"></i>pedicle</button><button class="b chip on" data-cls="0"><i style="background:#666"></i>other</button></div>
+          <div class="grp"><span class="lab">view</span><button class="b" data-view="lat">Lateral</button><button class="b" data-view="ap">AP</button><button class="b" data-view="ax">Axial</button></div>
+          <div class="grp"><button class="b on" id="btn-frame">Frame</button><button class="b on" id="btn-pair">Second bone</button><button class="b" id="btn-spin">Spin</button></div>
+        </div>
+        <div class="viewer">
+          <div class="canvas-wrap"><canvas class="gl" id="gl" aria-label="Interactive point cloud of two vertebrae"></canvas>
+            <div class="hud"><b id="hud-name"></b> · <span id="hud-mode">hand labels</span><div class="lg"><span><i style="background:#f2f2f2"></i>S cranio-caudal</span><span><i style="background:var(--viol)"></i>P posterior</span><span><i style="background:var(--lred)"></i>L lateral</span><span id="hud-err" hidden><i style="background:var(--red)"></i>false positive &nbsp;<i style="background:var(--blue)"></i>missed</span></div></div>
+          </div>
+          <aside class="readout" id="readout">
+            <div><h3 id="ro-bone">bone</h3></div>
+            <table><thead><tr><th>class</th><th>precision</th><th>recall</th></tr></thead><tbody id="ro-cls"></tbody></table>
+            <hr>
+            <h3>Frame: Sonata vs hand labels</h3>
+            <div class="row"><span>S axis</span><b id="ro-S">–</b></div>
+            <div class="row"><span>P axis</span><b id="ro-P">–</b></div>
+            <div class="row"><span>centre</span><b id="ro-C">–</b></div>
+            <hr>
+            <h3 id="ro-pair-h">Segment: hand · Sonata</h3>
+            <div class="row"><span>disc angle</span><b id="ro-da">–</b></div>
+            <div class="row"><span>disc height</span><b id="ro-dh">–</b></div>
+            <div class="row"><span>axial rotation</span><b id="ro-ar">–</b></div>
+            <div class="note">S = normal of the endplate planes · P = pedicle pair projected out of S · L = S × P. The same code that scores the paper computes these; nothing here is pre-baked.</div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="sec" id="sec-train">
+        <p class="eyebrow">Train · what it produces</p>
+        <h1>Two models trained inside the app, scored on subjects it never saw.</h1>
+        <p class="lede">Yamato is Point Transformer V3 from scratch; Sonata is the same backbone fine-tuned from Meta's self-supervised weights. Both were trained from the Light Table's labels and scored on the {{N.val}} validation bones of two held-out subjects.</p>
+        <div class="callouts">
+          <div class="co g"><div class="v">{{N.sup}} / {{N.inf_}}</div><div class="t">Endplates: solved</div><div class="d">superior / inferior endplate precision (Sonata); {{N.hisup}} / {{N.hiinf}} on the points the model is ≥99% sure of — plenty for a plane fit</div></div>
+          <div class="co r"><div class="v">{{N.ped}}</div><div class="t">Pedicles: the open gap</div><div class="d">both models leak the pedicle label posteriorly into the lamina — a boundary convention, not noise. That is where a surgeon's call matters.</div></div>
+          <div class="co b"><div class="v">{{N.axS}}°</div><div class="t">The frame survives</div><div class="d">median cranio-caudal axis error of the frame built from predicted labels vs. hand labels; centre within {{N.axC}} mm</div></div>
+        </div>
+        <div class="figs">
+          <div class="fig"><img src="{{IMG.results}}" alt="Results on the held-out bones"><div class="cap">Per-class precision / IoU / high-confidence precision, per-bone pedicle precision, and frame errors — every number regenerated from the models' validation dumps.</div></div>
+          <div class="fig"><img src="{{IMG.qual}}" alt="Qualitative: hand labels vs prediction vs errors"><div class="cap">Best, median and worst held-out bones by pedicle precision. Red = false positive, blue = missed. The error is anatomical and consistent, which is why it is fixable.</div></div>
+        </div>
+        <h2>What comes next</h2>
+        <div class="ledger">
+          <div><b>15,000 bones, Sonata-labelled</b>the HPC run pre-labels the next cohort; Lithium imports it as editable starting labels and residents correct instead of paint</div>
+          <div><b>Pedicle boundary convention</b>one afternoon of surgeon sign-off on where pedicle ends and lamina begins, then a retrain</div>
+          <div><b>Frames → measurements</b>segmental angles, axial rotation, 3D Lenke-style classification from the same labels — the deepfield pipeline</div>
+        </div>
+      </section>
+
+      <section class="sec" id="sec-why">
+        <p class="eyebrow">Why you · a surgeon's tool</p>
+        <h1>Why a spine surgeon's name belongs on this.</h1>
+        <p class="lede">Lithium is not an image-processing project that happens to touch the spine. Its ontology, its output and its open problems are all surgical. The name on it should be the person who decides what the anatomy means.</p>
+        <div class="cards">
+          <div class="card"><div class="n">01 · ontology</div><h4>It encodes your definition of a vertebra.</h4><p>Endplates and pedicles are the SRS three-dimensional frame. Lithium teaches a model to find exactly those surfaces — not voxels, not a bounding box. A surgeon's authorship says the anatomy is right.</p><div class="src">Stokes 1994 · SRS 3-D terminology</div></div>
+          <div class="card"><div class="n">02 · throughput</div><h4>Minutes per bone is what makes the dataset exist.</h4><p>Labelled data is the bottleneck of every spine-AI paper. 247 bones are done; 15,000 are in flight. Residents can label in the Light Table; you sign off the conventions, not the strokes.</p><div class="src">timing study designed, not yet run — the honest gap</div></div>
+          <div class="card"><div class="n">03 · output</div><h4>It ends at a measurement, not a segmentation.</h4><p>From labels to a local frame is one function; from frames to disc angles, axial rotation and a 3D deformity classification is the pipeline already built around it.</p><div class="src">frame error {{N.axS}}° median on held-out bones</div></div>
+          <div class="card"><div class="n">04 · papers</div><h4>Three papers, one program, your name on the clinical ones.</h4><p>The tool (arXiv, drafted). The method with released weights (Medical Image Analysis / Radiology: AI). The Gold247 dataset (Scientific Data). Each cites the others.</p><div class="src">manuscript 1 is built and verified today</div></div>
+          <div class="card"><div class="n">05 · ownership</div><h4>Yours to keep, no vendor in the loop.</h4><p>Open source under MIT, runs on a workstation in the lab, trains on your data without it leaving the building. Cedars tech-transfer friendly.</p><div class="src">github.com/saffffari/Lithium · v1.1</div></div>
+          <div class="card"><div class="n">06 · honesty</div><h4>The open items are surgical questions.</h4><p>Where does pedicle end and lamina begin? How fast can a trained resident label a bone, and how well do two people agree? These need a surgeon, not more GPUs.</p><div class="src">pedicle precision {{N.ped}} today</div></div>
+        </div>
+      </section>
+
+      <section class="sec" id="sec-ask">
+        <p class="eyebrow">The ask · four things</p>
+        <h1>Four things, about three hours of your time.</h1>
+        <div class="ask">
+          <div class="row"><div class="k">1</div><div><h4>Sign off the ontology and the pedicle–lamina boundary.</h4><p>Six classes today; the one convention the models disagree with the labels on is the posterior edge of the pedicle. Your call fixes the dataset and the retrain.</p></div><div class="time">30 min</div></div>
+          <div class="row"><div class="k">2</div><div><h4>Be the second annotator for the timing study.</h4><p>Fifteen bones in the Light Table, timed, blind to mine. That number — minutes per bone and how well two spine people agree — is what reviewers will ask for first.</p></div><div class="time">~1 h</div></div>
+          <div class="row"><div class="k">3</div><div><h4>Senior author on the method paper; co-sign the disclosure.</h4><p>Point Transformers for vertebral surface anatomy, with released weights and the Gold247 benchmark. Cedars Technology Transfer needs a disclosure before we promote the open-source release.</p></div><div class="time">review</div></div>
+          <div class="row"><div class="k">4</div><div><h4>One resident or fellow, two hours a week.</h4><p>Correcting Sonata's pre-labels on the 15,000-bone cohort in Lithium. They learn the anatomy in 3D; the lab gets the largest surface-labelled spine set that exists.</p></div><div class="time">2 h / wk</div></div>
+        </div>
+        <div class="close"><p>The tool works, the numbers are real and regenerable, and the first paper is written. What it lacks is the thing only a surgeon can give it: the authority to say the anatomy is right.</p></div>
+        <p style="margin-top:18px;color:var(--dimmer);font-size:12.5px">Keys <span class="kbd">1</span>–<span class="kbd">5</span> switch sections · in the Light Table, drag to rotate, wheel to zoom.</p>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<script>
+(function(){
+const DATA = {{DATA}};
+const $ = s => document.querySelector(s), $$ = s => Array.from(document.querySelectorAll(s));
+const TITLES = {sheets:"Contact Sheets", light:"Light Table", train:"Train", why:"Why you", ask:"The ask"};
+// ---------------- sections
+function show(sec){ $$('.sec').forEach(s=>s.classList.toggle('active', s.id==='sec-'+sec)); $$('.nav').forEach(n=>n.classList.toggle('active', n.dataset.sec===sec)); $('#tb-title').textContent = TITLES[sec]; if(sec==='light'){ resize(); render(); } }
+$$('.nav').forEach(n=>n.addEventListener('click', ()=>show(n.dataset.sec)));
+document.addEventListener('keydown', e=>{ const m={'1':'sheets','2':'light','3':'train','4':'why','5':'ask'}[e.key]; if(m && !e.metaKey && !e.ctrlKey){ show(m); } });
+// ---------------- screenshots
+const CAPS = {light:"<b>LIGHT TABLE</b> — paint per-point labels with pick, box, lasso, polygon, brush and curve; INFER runs the project's model on this cloud; every stroke is saved and undoable.",
+  sheets:"<b>SHEETS</b> — the catalog: projects in the left rail, label-coloured previews in the gallery, the ontology per project, the always-present Sandbox for trying any model on any bone.",
+  train:"<b>TRAIN</b> — pick clouds and classes, export a Pointcept dataset, launch PT-v3 training in a sidecar process, and manage the registered models; the best one becomes INFER's default."};
+const IMGS = {light:"{{IMG.light}}", sheets:"{{IMG.sheets}}", train:"{{IMG.train}}"};
+$$('.thumb').forEach(t=>t.addEventListener('click', ()=>{ $$('.thumb').forEach(x=>x.classList.toggle('active', x===t)); $('#shot-img').src = IMGS[t.dataset.shot]; $('#shot-cap').innerHTML = CAPS[t.dataset.shot]; }));
+// ---------------- data
+function b64(s){ const bin = atob(s); const u = new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i); return u; }
+function unpack(b){ const q = new Int16Array(b64(b.xyz).buffer); const xyz = new Float32Array(q.length); for(let i=0;i<q.length;i++) xyz[i]=q[i]/100; return {name:b.name, level:b.level, n:b.n, xyz, gt:b64(b.gt), pred:b64(b.pred)}; }
+const A = unpack(DATA.A), B = unpack(DATA.B);
+// ---------------- vector math + the frame (port of training/runs/local_axis.py)
+const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2], sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]], add=(a,b)=>[a[0]+b[0],a[1]+b[1],a[2]+b[2]], mul=(a,s)=>[a[0]*s,a[1]*s,a[2]*s];
+const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]], norm=a=>Math.sqrt(dot(a,a)), unit=a=>{const n=norm(a)+1e-12; return [a[0]/n,a[1]/n,a[2]/n];};
+function pts(bone, lab, cls){ const out=[]; for(let i=0;i<bone.n;i++) if(lab[i]===cls) out.push(i); return out; }
+function meanOf(xyz, idx){ let c=[0,0,0]; for(const i of idx){ c[0]+=xyz[3*i]; c[1]+=xyz[3*i+1]; c[2]+=xyz[3*i+2]; } return mul(c, 1/Math.max(1,idx.length)); }
+function covOf(xyz, idx, c){ const m=[[0,0,0],[0,0,0],[0,0,0]]; for(const i of idx){ const d=[xyz[3*i]-c[0], xyz[3*i+1]-c[1], xyz[3*i+2]-c[2]]; for(let r=0;r<3;r++) for(let s=0;s<3;s++) m[r][s]+=d[r]*d[s]; } return m; }
+function jacobi(m){ const a=m.map(r=>r.slice()), v=[[1,0,0],[0,1,0],[0,0,1]]; for(let it=0;it<50;it++){ let p=0,q=1,mx=0; for(let r=0;r<3;r++) for(let s=r+1;s<3;s++) if(Math.abs(a[r][s])>mx){mx=Math.abs(a[r][s]);p=r;q=s;} if(mx<1e-12) break; const th=0.5*Math.atan2(2*a[p][q], a[q][q]-a[p][p]), c=Math.cos(th), s=Math.sin(th); for(let k=0;k<3;k++){ const akp=a[k][p], akq=a[k][q]; a[k][p]=c*akp-s*akq; a[k][q]=s*akp+c*akq; } for(let k=0;k<3;k++){ const apk=a[p][k], aqk=a[q][k]; a[p][k]=c*apk-s*aqk; a[q][k]=s*apk+c*aqk; } for(let k=0;k<3;k++){ const vkp=v[k][p], vkq=v[k][q]; v[k][p]=c*vkp-s*vkq; v[k][q]=s*vkp+c*vkq; } } const vals=[a[0][0],a[1][1],a[2][2]]; const vecs=[0,1,2].map(j=>[v[0][j],v[1][j],v[2][j]]); return {vals, vecs}; }
+function plane(xyz, idx){ const c=meanOf(xyz,idx); const {vals,vecs}=jacobi(covOf(xyz,idx,c)); let k=0; for(let j=1;j<3;j++) if(vals[j]<vals[k]) k=j; return {c, n:unit(vecs[k])}; }
+function splitLR(xyz, idx){ const c=meanOf(xyz,idx); const {vals,vecs}=jacobi(covOf(xyz,idx,c)); let k=0; for(let j=1;j<3;j++) if(vals[j]>vals[k]) k=j; const v1=vecs[k]; let a=[],b=[]; for(const i of idx){ const t=dot([xyz[3*i]-c[0],xyz[3*i+1]-c[1],xyz[3*i+2]-c[2]], v1); (t<0?a:b).push(i); } for(let it=0;it<10;it++){ const ca=meanOf(xyz,a), cb=meanOf(xyz,b); const na=[], nb=[]; for(const i of idx){ const p=[xyz[3*i],xyz[3*i+1],xyz[3*i+2]]; (norm(sub(p,ca))<norm(sub(p,cb))?na:nb).push(i); } a=na; b=nb; } return [a,b]; }
+function axisFromLabels(bone, lab){ const S_=pts(bone,lab,1), I_=pts(bone,lab,2), P_=pts(bone,lab,3); if(Math.min(S_.length,I_.length,P_.length)<30) return null; const xyz=bone.xyz; let {c:cs,n:ns}=plane(xyz,S_); let {c:ci,n:ni}=plane(xyz,I_); const C=mul(add(cs,ci),0.5); if(dot(ns,sub(cs,C))<0) ns=mul(ns,-1); if(dot(ni,sub(ci,C))<0) ni=mul(ni,-1); const S=unit(sub(ns,ni)); let [pa,pb]=splitLR(xyz,P_); const pm=mul(add(meanOf(xyz,pa),meanOf(xyz,pb)),0.5); const d=sub(pm,C); const P=unit(sub(d, mul(S, dot(d,S)))); const L=unit(cross(S,P)); return {C,S,P,L,cs,ns,ci,ni}; }
+const ang=(a,b)=>Math.acos(Math.min(1,Math.abs(dot(a,b))))*180/Math.PI;
+function pairMetrics(up, lo){ const n=unit(sub(up.ni, lo.ns)); const discAngle=ang(up.ni, lo.ns); const discHeight=Math.abs(dot(sub(lo.cs, up.ci), n)); const Sm=unit(add(up.S,lo.S)); const pu=unit(sub(up.P, mul(Sm, dot(up.P,Sm)))), pl=unit(sub(lo.P, mul(Sm, dot(lo.P,Sm)))); const axial=Math.atan2(dot(cross(pu,pl),Sm), dot(pu,pl))*180/Math.PI; return {discAngle, discHeight, axial}; }
+const FR = {A:{gt:axisFromLabels(A,A.gt), pred:axisFromLabels(A,A.pred)}, B:{gt:axisFromLabels(B,B.gt), pred:axisFromLabels(B,B.pred)}};
+// ---------------- WebGL
+const canvas=$('#gl'); const gl=canvas.getContext('webgl2',{antialias:true, alpha:false});
+let prog=null, posBufs={}, colBufs={}, counts={}, lineBuf=null, lineCount=0;
+const VS=`#version 300 es
+in vec3 aPos; in vec3 aCol; uniform mat4 uMVP; uniform float uSize; out vec3 vCol;
+void main(){ gl_Position=uMVP*vec4(aPos,1.0); gl_PointSize=uSize; vCol=aCol; }`;
+const FS=`#version 300 es
+precision mediump float; in vec3 vCol; uniform int uRound; out vec4 o;
+void main(){ if(uRound==1){ vec2 d=gl_PointCoord-0.5; if(dot(d,d)>0.25) discard; } o=vec4(vCol,1.0); }`;
+function sh(t,s){ const x=gl.createShader(t); gl.shaderSource(x,s); gl.compileShader(x); if(!gl.getShaderParameter(x,gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(x)); return x; }
+if(gl){ prog=gl.createProgram(); gl.attachShader(prog,sh(gl.VERTEX_SHADER,VS)); gl.attachShader(prog,sh(gl.FRAGMENT_SHADER,FS)); gl.linkProgram(prog); gl.useProgram(prog); gl.enable(gl.DEPTH_TEST); gl.clearColor(0.02,0.02,0.02,1);
+  for(const k of ['A','B']){ posBufs[k]=gl.createBuffer(); colBufs[k]=gl.createBuffer(); counts[k]=0; } lineBuf=gl.createBuffer(); }
+const U={mvp:gl&&gl.getUniformLocation(prog,'uMVP'), size:gl&&gl.getUniformLocation(prog,'uSize'), round:gl&&gl.getUniformLocation(prog,'uRound')};
+const ATT={pos:gl&&gl.getAttribLocation(prog,'aPos'), col:gl&&gl.getAttribLocation(prog,'aCol')};
+// ---------------- state
+const st={mode:'gt', vis:{0:true,1:true,2:true,3:true}, frame:true, pair:true, spin:false, right:[1,0,0], up:[0,0,1], target:[0,0,0], halfH:52};
+const hex=h=>[parseInt(h.slice(1,3),16)/255, parseInt(h.slice(3,5),16)/255, parseInt(h.slice(5,7),16)/255];
+const CLS={0:hex('#4a4a4a'),1:hex('#d65e00'),2:hex('#0073b2'),3:hex('#57e87e')}, FP=hex('#ff395d'), FN=hex('#638bff'), BGOK=hex('#3a3a3a');
+function colorOf(bone,i){ const g=bone.gt[i], p=bone.pred[i]; if(st.mode==='gt') return CLS[g]; if(st.mode==='pred') return CLS[p]; if(p===g) return g?CLS[g]:BGOK; return p? FP : FN; }
+function classShown(bone,i){ const lab = st.mode==='gt' ? bone.gt[i] : bone.pred[i]; return st.vis[lab]; }
+function upload(k, bone){ const P=[], C=[]; for(let i=0;i<bone.n;i++){ if(!classShown(bone,i)) continue; P.push(bone.xyz[3*i],bone.xyz[3*i+1],bone.xyz[3*i+2]); const c=colorOf(bone,i); C.push(c[0],c[1],c[2]); }
+  gl.bindBuffer(gl.ARRAY_BUFFER,posBufs[k]); gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(P),gl.STATIC_DRAW); gl.bindBuffer(gl.ARRAY_BUFFER,colBufs[k]); gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(C),gl.STATIC_DRAW); counts[k]=P.length/3; }
+function frameLines(fr, bright){ if(!fr) return []; const L=[]; const w=bright?1:0.45; const seg=(a,b,c)=>{L.push(a[0],a[1],a[2],c[0]*w,c[1]*w,c[2]*w, b[0],b[1],b[2],c[0]*w,c[1]*w,c[2]*w);};
+  const len=30; seg(fr.C, add(fr.C,mul(fr.S,len)), hex('#f2f2f2')); seg(fr.C, add(fr.C,mul(fr.P,len)), hex('#b48cff')); seg(fr.C, add(fr.C,mul(fr.L,len)), hex('#ff5c5c'));
+  seg(fr.cs, add(fr.cs,mul(fr.ns,12)), hex('#ff8a3d')); seg(fr.ci, add(fr.ci,mul(fr.ni,12)), hex('#3aa0ff')); return L; }
+function uploadLines(){ if(!gl) return; let L=[]; if(st.frame){ for(const k of (st.pair?['A','B']:['A'])){ const f=FR[k]; if(st.mode==='gt'){ L=L.concat(frameLines(f.gt,true)); } else { L=L.concat(frameLines(f.gt,false)); L=L.concat(frameLines(f.pred,true)); } } }
+  gl.bindBuffer(gl.ARRAY_BUFFER,lineBuf); gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(L),gl.STATIC_DRAW); lineCount=L.length/6; }
+function refreshAll(){ if(!gl) return; upload('A',A); upload('B',B); uploadLines(); updateTarget(); render(); readout(); }
+function updateTarget(){ const bones = st.pair?[A,B]:[A]; let c=[0,0,0], n=0; for(const b of bones){ for(let i=0;i<b.n;i++){ c[0]+=b.xyz[3*i]; c[1]+=b.xyz[3*i+1]; c[2]+=b.xyz[3*i+2]; } n+=b.n; } st.target=mul(c,1/n); }
+function resize(){ if(!gl) return; const dpr=Math.min(2,window.devicePixelRatio||1); const w=canvas.clientWidth, h=canvas.clientHeight; if(canvas.width!==Math.round(w*dpr)||canvas.height!==Math.round(h*dpr)){ canvas.width=Math.round(w*dpr); canvas.height=Math.round(h*dpr); } }
+function mvp(){ const r=st.right, u=st.up, b=cross(r,u), t=st.target; const aspect=canvas.width/Math.max(1,canvas.height); const sy=st.halfH, sx=st.halfH*aspect, sz=250;
+  return new Float32Array([r[0]/sx,u[0]/sy,-b[0]/sz,0, r[1]/sx,u[1]/sy,-b[1]/sz,0, r[2]/sx,u[2]/sy,-b[2]/sz,0, -dot(r,t)/sx,-dot(u,t)/sy,dot(b,t)/sz,1]); }
+function render(){ if(!gl) return; resize(); gl.viewport(0,0,canvas.width,canvas.height); gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT); gl.useProgram(prog); gl.uniformMatrix4fv(U.mvp,false,mvp());
+  const dpr=Math.min(2,window.devicePixelRatio||1); gl.uniform1f(U.size, Math.max(2, Math.min(9, 1.6+95/st.halfH))*dpr); gl.uniform1i(U.round,1);
+  for(const k of (st.pair?['A','B']:['A'])){ gl.bindBuffer(gl.ARRAY_BUFFER,posBufs[k]); gl.enableVertexAttribArray(ATT.pos); gl.vertexAttribPointer(ATT.pos,3,gl.FLOAT,false,0,0); gl.bindBuffer(gl.ARRAY_BUFFER,colBufs[k]); gl.enableVertexAttribArray(ATT.col); gl.vertexAttribPointer(ATT.col,3,gl.FLOAT,false,0,0); gl.drawArrays(gl.POINTS,0,counts[k]); }
+  if(lineCount){ gl.disable(gl.DEPTH_TEST); gl.uniform1i(U.round,0); gl.bindBuffer(gl.ARRAY_BUFFER,lineBuf); gl.vertexAttribPointer(ATT.pos,3,gl.FLOAT,false,24,0); gl.vertexAttribPointer(ATT.col,3,gl.FLOAT,false,24,12); gl.drawArrays(gl.LINES,0,lineCount); gl.enable(gl.DEPTH_TEST); } }
+function rot(v,k,th){ const c=Math.cos(th), s=Math.sin(th); return add(add(mul(v,c), mul(cross(k,v),s)), mul(k, dot(k,v)*(1-c))); }
+function orbit(dx,dy){ st.right=unit(rot(st.right, st.up, -dx)); const back=unit(cross(st.right,st.up)); st.up=unit(rot(st.up, st.right, -dy)); const b2=unit(cross(st.right,st.up)); st.up=unit(cross(b2,st.right)); }
+function setView(name){ const f=FR.A.gt||FR.A.pred; if(!f){ return; } if(name==='lat'){ st.right=mul(f.P,-1); st.up=f.S; } else if(name==='ap'){ st.right=mul(f.L,-1); st.up=f.S; } else { st.right=mul(f.L,-1); st.up=f.P; } st.right=unit(st.right); const b=unit(cross(st.right,st.up)); st.up=unit(cross(b,st.right)); render(); }
+// interaction
+let drag=null, lastInteract=0;
+canvas.addEventListener('pointerdown',e=>{ drag={x:e.clientX,y:e.clientY}; canvas.setPointerCapture(e.pointerId); lastInteract=performance.now(); });
+canvas.addEventListener('pointermove',e=>{ if(!drag) return; const dx=(e.clientX-drag.x)*0.008, dy=(e.clientY-drag.y)*0.008; drag={x:e.clientX,y:e.clientY}; orbit(dx,dy); lastInteract=performance.now(); render(); });
+canvas.addEventListener('pointerup',()=>{drag=null;}); canvas.addEventListener('pointercancel',()=>{drag=null;});
+canvas.addEventListener('wheel',e=>{ e.preventDefault(); st.halfH=Math.max(18,Math.min(200, st.halfH*Math.exp(e.deltaY*0.0012))); lastInteract=performance.now(); render(); },{passive:false});
+window.addEventListener('resize',()=>{ if($('#sec-light').classList.contains('active')) render(); });
+const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+function tick(){ if(st.spin && !drag && !reduced && $('#sec-light').classList.contains('active')){ orbit(0.004,0); render(); } requestAnimationFrame(tick); }
+// controls
+$$('[data-mode]').forEach(b=>b.addEventListener('click',()=>{ st.mode=b.dataset.mode; $$('[data-mode]').forEach(x=>x.classList.toggle('on',x===b)); $('#hud-mode').textContent={gt:'hand labels',pred:'Sonata prediction',err:'errors vs hand labels'}[st.mode]; $('#hud-err').hidden = st.mode!=='err'; refreshAll(); }));
+$$('[data-cls]').forEach(b=>b.addEventListener('click',()=>{ const c=+b.dataset.cls; st.vis[c]=!st.vis[c]; b.classList.toggle('on',st.vis[c]); refreshAll(); }));
+$$('[data-view]').forEach(b=>b.addEventListener('click',()=>setView(b.dataset.view)));
+$('#btn-frame').addEventListener('click',e=>{ st.frame=!st.frame; e.currentTarget.classList.toggle('on',st.frame); uploadLines(); render(); });
+$('#btn-pair').addEventListener('click',e=>{ st.pair=!st.pair; e.currentTarget.classList.toggle('on',st.pair); refreshAll(); });
+$('#btn-spin').addEventListener('click',e=>{ st.spin=!st.spin; e.currentTarget.classList.toggle('on',st.spin); });
+// readout
+function prec(bone){ const rows=[]; for(const c of [1,2,3]){ let tp=0,pp=0,gg=0; for(let i=0;i<bone.n;i++){ const g=bone.gt[i]===c, p=bone.pred[i]===c; if(p) pp++; if(g) gg++; if(g&&p) tp++; } rows.push([c, pp?tp/pp:NaN, gg?tp/gg:NaN]); } return rows; }
+const fmt=(x,d=2,suf='')=>Number.isFinite(x)?x.toFixed(d)+suf:'–';
+function grade(x, good, warn){ return x<=good?'ok':(x<=warn?'warn':'bad'); }
+function readout(){ const names={1:'sup. endplate',2:'inf. endplate',3:'pedicle'}; $('#ro-bone').textContent=A.name+' · '+A.n.toLocaleString()+' pts'; $('#hud-name').textContent=A.name+(st.pair?' + '+B.name:'');
+  $('#ro-cls').innerHTML = prec(A).map(([c,p,r])=>`<tr><td>${names[c]}</td><td>${fmt(p)}</td><td>${fmt(r)}</td></tr>`).join('');
+  const g=FR.A.gt, p=FR.A.pred; if(g&&p){ const S=ang(g.S,p.S), P=ang(g.P,p.P), C=norm(sub(g.C,p.C)); $('#ro-S').innerHTML=`<span class="${grade(S,1,3)}">${fmt(S)}°</span>`; $('#ro-P').innerHTML=`<span class="${grade(P,2,6)}">${fmt(P,1)}°</span>`; $('#ro-C').innerHTML=`<span class="${grade(C,1,2)}">${fmt(C)} mm</span>`; }
+  const pairRows=[['#ro-da','discAngle','°',1],['#ro-dh','discHeight',' mm',1],['#ro-ar','axial','°',1]];
+  if(st.pair && FR.A.gt && FR.B.gt && FR.A.pred && FR.B.pred){ const mg=pairMetrics(FR.A.gt,FR.B.gt), mp=pairMetrics(FR.A.pred,FR.B.pred); $('#ro-pair-h').textContent=`Segment ${A.level}–${B.level}: hand · Sonata`; for(const [id,k,s,d] of pairRows){ const delta=Math.abs(mg[k]-mp[k]); $(id).innerHTML=`${fmt(mg[k],d)}${s} · ${fmt(mp[k],d)}${s} <span class="${grade(delta,1,3)}">Δ${fmt(delta,1)}</span>`; } }
+  else { $('#ro-pair-h').textContent='Segment: turn on the second bone'; for(const [id] of pairRows) $(id).textContent='–'; } }
+// boot
+if(gl){ setView('lat'); refreshAll(); requestAnimationFrame(tick); } else { $('.canvas-wrap').innerHTML='<div style="padding:40px;color:#8a8a8a;font-family:var(--mono)">WebGL2 is not available in this browser — the live viewer needs it.</div>'; readout(); }
+})();
+</script>
