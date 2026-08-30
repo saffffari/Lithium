@@ -82,8 +82,20 @@ def read_ply(path: Path, label_field: str | None):
     field = label_field or _pick_label_field(names)
     lbl = np.asarray(v[field], dtype=np.int32) if field else None
     scal = {}
-    if "intensity" in names:
-        scal["intensity"] = np.asarray(v["intensity"], dtype=np.float32)
+    # Keep everything else the exporter wrote: oriented normals become the
+    # cloud's ``normal`` field (the inference path prefers stored normals to
+    # re-fitting them), and every other numeric per-vertex property (hu0,
+    # hu_in, hu_out, tips, level, ...) is kept as a scalar so it can be
+    # used later (e.g. tips as a second label layer).
+    if all(c in names for c in ("nx", "ny", "nz")):
+        scal["normal"] = np.stack([v["nx"], v["ny"], v["nz"]], axis=1).astype(np.float32)
+    skip = {"x", "y", "z", "nx", "ny", "nz", "red", "green", "blue", "alpha", field}
+    for n in names:
+        if n in skip:
+            continue
+        arr = np.asarray(v[n])
+        if np.issubdtype(arr.dtype, np.number):
+            scal[n] = arr.astype(np.float32)
     return xyz, rgb, lbl, scal
 
 
