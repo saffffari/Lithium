@@ -2153,6 +2153,7 @@ def _draw_light_table_tab(app) -> bool:
     # same runner/namespace/undo path as batch inference.
     from src.gui.infer_widget import draw_light_table_infer
     _draw_sandbox_layer_picker(app)
+    _draw_inference_model_picker(app)   # hides itself when nothing is eligible
     _ckpt = _resolve_inference_checkpoint(app)
     _project_id = _resolve_active_project_id(app)
     _chosen = _resolve_inference_model(app, _project_id) if _ckpt else None
@@ -4070,6 +4071,17 @@ def _inference_eligible_models(app, project_id: str | None) -> list:
     because they never produced a checkpoint to point at.
     """
     registry = getattr(app, '_train_model_registry', None)
+    if registry is None and project_id:
+        # Lazy-init here, not only in the TRAIN tab's picker: the Light
+        # Table asks for eligible models long before anyone visits TRAIN,
+        # and a None registry read as "no trained model".
+        try:
+            from src.data.model_registry import ProjectModelRegistry
+            from src.data.library_catalog import library_dir
+            registry = ProjectModelRegistry(library_dir())
+            app._train_model_registry = registry
+        except Exception:
+            registry = None
     if not project_id or registry is None:
         return []
     from src.data import sandbox as _sb

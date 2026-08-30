@@ -185,9 +185,11 @@ def draw_light_table_infer(app, *, start_infer, model_label: str | None,
                        col32((_SWEEP[0], _SWEEP[1], _SWEEP[2], 0.12 if (hovered and ready) else 0.05)), s(3))
 
     # ---- constellation ----------------------------------------------
-    cx = wx + w * 0.5
-    cy = wy + h * 0.47
-    scale = min(w, h) * 0.42
+    # Constellation on the right, big label on the left — they used to
+    # share the centre and overprint each other.
+    cx = wx + w * 0.80
+    cy = wy + h * 0.45
+    scale = h * 0.36
 
     if con is not None:
         pts = con["pts"]
@@ -354,7 +356,7 @@ def draw_light_table_infer(app, *, start_infer, model_label: str | None,
     else:
         imgui.set_window_font_scale(1.7)
     _bw, _bh = imgui.calc_text_size(big)
-    dl.add_text(cx - _bw * 0.5, cy - _bh * 0.5, col32(big_col), big)
+    dl.add_text(wx + s(14), cy - _bh * 0.5 - th * 0.15, col32(big_col), big)
     imgui.set_window_font_scale(1.0)
     if _fd is not None:
         imgui.pop_font()
