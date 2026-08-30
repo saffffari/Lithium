@@ -2148,8 +2148,6 @@ def _draw_light_table_tab(app) -> bool:
 
     # POINT SIZE / DISPLAY / DISPLAY MODE / CLIP / CAMERA — shared with
     # HOLOGRAM so visual tweaks transfer between workflows.
-    changed |= _draw_viewport_view_controls(app)
-
     # --- INFER (cloud-constellation loader button, 1.1) ---
     # Runs the active project's model on the current cloud through the
     # same runner/namespace/undo path as batch inference.
@@ -2170,6 +2168,9 @@ def _draw_light_table_tab(app) -> bool:
         can_run=bool(_ckpt) and not _runner_busy,
         registry=app.label_registry,
     )
+
+    changed |= _draw_viewport_view_controls(app)
+
 
     # Everything below the clouds list, measured for next frame's flex.
     app._lt_below_clouds_h = imgui.get_cursor_screen_pos()[1] - _lt_y1
