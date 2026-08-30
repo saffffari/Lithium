@@ -420,8 +420,10 @@ def _draw_view_panel(app, show_bg: bool = True,
         from src.gui.op1_wireframe import op1_camera_cube
         import math
 
-        avail_h = imgui.get_content_region_available()[1]
-        panel_h = max(th * 10.0, avail_h)
+        # Fixed, compact: the panel used to stretch to the bottom of the
+        # sidebar, which on a tall window left a huge empty band under the
+        # cube and pushed INFER below the fold.
+        panel_h = th * 8.5
 
         preset = app.camera.active_preset
         is_planar = preset in PLANAR_PRESETS
@@ -1376,7 +1378,11 @@ def _draw_sort_bar(app) -> bool:
     return changed
 
 
-def _draw_clouds_section(app, child_id: str = "##clouds") -> bool:
+_clouds_resize_dragging: bool = False
+
+
+def _draw_clouds_section(app, child_id: str = "##clouds",
+                         height: float | None = None) -> bool:
     """Shared CLOUDS section — scrollable cloud list with adjustable height.
 
     Each row shows the distinct label colors present in the cloud (cached
@@ -1391,8 +1397,20 @@ def _draw_clouds_section(app, child_id: str = "##clouds") -> bool:
                    OP1_GREEN[2] * 0.10, 1.0)
     cache = getattr(app, 'label_count_cache', None)
     registry = getattr(app, 'label_registry', None)
+    global _clouds_resize_dragging
     if op1_section("CLOUDS", OP1_GREEN, fill_color=_green_tint, collapsible=False):
-        clouds_h = getattr(app, '_clouds_list_h', th * 5.5)
+        # Height: an explicit drag-handle value wins; else the caller's
+        # flex height (Light Table: fill what the sections below leave);
+        # else the compact default.
+        stored = float(getattr(app, '_clouds_list_h', 0.0) or 0.0)
+        if stored > 0:
+            clouds_h = stored
+        elif height is not None:
+            clouds_h = height
+        else:
+            clouds_h = th * 5.5
+        clouds_h = max(th * 3.0, float(clouds_h))
+        app._lt_clouds_child_h = clouds_h
         imgui.begin_child(child_id, 0, clouds_h, border=False)
         # Multi-select state — only meaningful in Contact Sheets, but the
         # set/anchor live on app and are read here regardless. ``selected_index``
@@ -1469,6 +1487,43 @@ def _draw_clouds_section(app, child_id: str = "##clouds") -> bool:
                     app.contact_sheets_selected_anchor = i
                 changed = True
         imgui.end_child()
+        # ---- resize handle: drag to pin a height, double-click = auto ----
+        if height is not None or stored > 0:
+            dl = imgui.get_window_draw_list()
+            hx, hy = imgui.get_cursor_screen_pos()
+            hw = imgui.get_content_region_available_width()
+            handle_h = s(6)
+            mx, my = imgui.get_mouse_pos()
+            in_handle = (hx <= mx <= hx + hw and hy <= my <= hy + handle_h)
+            active = _clouds_resize_dragging or in_handle
+            col = imgui.get_color_u32_rgba(0.0, 0.93, 0.58, 0.75) if active \
+                else imgui.get_color_u32_rgba(0.3, 0.3, 0.3, 0.55)
+            bar_y = hy + handle_h * 0.5
+            bar_len, gap, cx = th * 1.1, th * 0.25, hx + hw * 0.5
+            dl.add_line(cx - gap - bar_len, bar_y, cx - gap, bar_y, col, max(1.0, s(1.0)))
+            dl.add_line(cx + gap, bar_y, cx + gap + bar_len, bar_y, col, max(1.0, s(1.0)))
+            imgui.dummy(hw, handle_h)
+            if _clouds_resize_dragging:
+                if imgui.is_mouse_down(0):
+                    dy = imgui.get_io().mouse_delta[1]
+                    if abs(dy) > 0.01:
+                        app._clouds_list_h = float(max(th * 3.0, min(th * 60.0, clouds_h + dy)))
+                else:
+                    _clouds_resize_dragging = False
+                    try:
+                        from src.utils.prefs import update_prefs
+                        update_prefs({'clouds_list_h': float(app._clouds_list_h)})
+                    except Exception:
+                        pass
+            elif in_handle and imgui.is_mouse_double_clicked(0):
+                app._clouds_list_h = 0.0  # back to auto-fill
+                try:
+                    from src.utils.prefs import update_prefs
+                    update_prefs({'clouds_list_h': 0.0})
+                except Exception:
+                    pass
+            elif in_handle and imgui.is_mouse_clicked(0):
+                _clouds_resize_dragging = True
     return changed
 
 
@@ -1492,12 +1547,18 @@ def _draw_labels_section(app, child_id: str = "##labels") -> bool:
         changed |= draw_label_add_button(app)
 
         stored = getattr(app, '_labels_list_h', 0.0)
-        label_max_h = stored if stored > 0 else th * 10
+        # Auto height = the rows themselves (measured last frame), capped at
+        # 10 lines; a dragged height pins it, double-click on the handle
+        # goes back to auto.
+        _content_h = float(getattr(app, '_labels_content_h', 0.0) or 0.0)
+        _auto_h = min(th * 10, max(th * 3.0, _content_h + th * 0.35)) if _content_h > 0 else th * 10
+        label_max_h = stored if stored > 0 else _auto_h
         min_h = th * 3.0
         max_h = th * 40.0
 
         imgui.begin_child(child_id, 0, label_max_h, border=False)
         changed |= draw_label_panel(app)
+        app._labels_content_h = imgui.get_cursor_pos_y()
         imgui.end_child()
 
         # --- Resize handle ---
@@ -1543,6 +1604,13 @@ def _draw_labels_section(app, child_id: str = "##labels") -> bool:
                     update_prefs({'labels_list_h': float(app._labels_list_h)})
                 except Exception:
                     pass
+        elif in_handle and imgui.is_mouse_double_clicked(0):
+            app._labels_list_h = 0.0  # back to auto height
+            try:
+                from src.utils.prefs import update_prefs
+                update_prefs({'labels_list_h': 0.0})
+            except Exception:
+                pass
         elif in_handle and imgui.is_mouse_clicked(0):
             _labels_resize_dragging = True
     return changed
@@ -2013,7 +2081,18 @@ def _draw_light_table_tab(app) -> bool:
     app.label_blend = 1.0
 
     # --- CLOUDS ---
-    changed |= _draw_clouds_section(app, "##lt_clouds")
+    # Bottom-anchored layout: CLOUDS absorbs whatever the sections below it
+    # did not use last frame, so the controls stack ends at the bottom edge
+    # and RUN INFERENCE is always on screen.
+    _lt_avail = imgui.get_content_region_available()[1]
+    _lt_below = getattr(app, '_lt_below_clouds_h', None)
+    _lt_chrome = float(getattr(app, '_lt_clouds_chrome_h', th * 2.4))
+    _lt_flex = (None if _lt_below is None
+                else max(th * 3.0, _lt_avail - _lt_below - _lt_chrome - th * 0.4))
+    _lt_y0 = imgui.get_cursor_screen_pos()[1]
+    changed |= _draw_clouds_section(app, "##lt_clouds", height=_lt_flex)
+    _lt_y1 = imgui.get_cursor_screen_pos()[1]
+    app._lt_clouds_chrome_h = max(0.0, (_lt_y1 - _lt_y0) - float(getattr(app, '_lt_clouds_child_h', 0.0)))
 
     # --- VOLUME metadata (shown when selected cloud is volume-derived) ---
     if 0 <= app.selected_index < len(app.entries):
@@ -2091,6 +2170,8 @@ def _draw_light_table_tab(app) -> bool:
         registry=app.label_registry,
     )
 
+    # Everything below the clouds list, measured for next frame's flex.
+    app._lt_below_clouds_h = imgui.get_cursor_screen_pos()[1] - _lt_y1
     return changed
 
 

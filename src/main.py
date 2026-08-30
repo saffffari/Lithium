@@ -554,6 +554,7 @@ class App:
         self.gallery_cell_size: int = int(prefs.get("gallery_cell_size", 220))
         # Labels panel height (draggable resize handle in sidebar)
         self._labels_list_h: float = float(prefs.get("labels_list_h", 0.0))
+        self._clouds_list_h: float = float(prefs.get("clouds_list_h", 0.0))  # 0 = auto-fill
         # Pointcept training env paths (persisted across sessions)
         self._train_python_exe: str = prefs.get("train_python_exe", "")
         self._train_pointcept_dir: str = prefs.get("train_pointcept_dir", "")

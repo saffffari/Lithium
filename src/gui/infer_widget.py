@@ -133,7 +133,7 @@ def draw_light_table_infer(app, *, start_infer, model_label: str | None,
     dl = imgui.get_window_draw_list()
     wx, wy = imgui.get_cursor_screen_pos()
     w = imgui.get_content_region_available_width()
-    h = th * 7.0
+    h = th * 5.5
     if w <= 0:
         return
 
@@ -180,6 +180,9 @@ def draw_light_table_infer(app, *, start_infer, model_label: str | None,
     clicked = hovered and imgui.is_mouse_clicked(0)
 
     ready = can_run and entry is not None and con is not None
+    # A button should look like one: faint fill, brighter on hover.
+    dl.add_rect_filled(wx, wy, wx + w, wy + h,
+                       col32((_SWEEP[0], _SWEEP[1], _SWEEP[2], 0.12 if (hovered and ready) else 0.05)), s(3))
 
     # ---- constellation ----------------------------------------------
     cx = wx + w * 0.5
@@ -328,6 +331,33 @@ def draw_light_table_infer(app, *, start_infer, model_label: str | None,
     else:
         status = "INFER"
         status_col = _SWEEP if (hovered and ready) else OP1_GRAY
+
+    # ---- the big label: say what the button does -----------------------
+    from src.gui.theme import OP1_WHITE
+    if state == "running":
+        big, big_col = "INFERRING", _SWEEP
+    elif state == "complete":
+        big, big_col = "LABELED", OP1_GREEN
+    elif state == "failed":
+        big, big_col = "FAILED", OP1_RED
+    elif not can_run:
+        big, big_col = "NO MODEL", OP1_DIM
+    elif entry is None:
+        big, big_col = "SELECT A CLOUD", OP1_DIM
+    else:
+        big, big_col = "RUN INFERENCE", (_SWEEP if hovered else OP1_WHITE)
+    _gui = getattr(app, "gui", None)
+    _fd = getattr(_gui, "font_display", None)
+    if _fd is not None:
+        imgui.push_font(_fd)
+        imgui.set_window_font_scale(0.5)
+    else:
+        imgui.set_window_font_scale(1.7)
+    _bw, _bh = imgui.calc_text_size(big)
+    dl.add_text(cx - _bw * 0.5, cy - _bh * 0.5, col32(big_col), big)
+    imgui.set_window_font_scale(1.0)
+    if _fd is not None:
+        imgui.pop_font()
 
     dl.add_text(wx + s(8), wy + h - th * 1.25, col32(status_col), status)
     if model_label:
