@@ -277,6 +277,11 @@ class App:
         self._sidebar_right_fb: int = 0
         self.fps = 0.0
         self.last_fps_time = 0.0
+        try:
+            self._fps_log_every = float(os.environ.get("LITHIUM_FPS_LOG", "0") or 0)
+        except ValueError:
+            self._fps_log_every = 0.0
+        self._fps_log_t = 0.0
         self.gui_visible = True
         self.show_bbox = False
         self.show_grid = False
@@ -646,7 +651,13 @@ class App:
         glfw.window_hint(glfw.CONTEXT_VERSION_MINOR, 1)
         glfw.window_hint(glfw.OPENGL_PROFILE, glfw.OPENGL_CORE_PROFILE)
         glfw.window_hint(glfw.OPENGL_FORWARD_COMPAT, True)
-        glfw.window_hint(glfw.SAMPLES, 4)
+        # MSAA samples: LITHIUM_MSAA=0 disables multisampling (a 4x fill
+        # cost at 5K Retina on OpenGL-over-Metal).
+        try:
+            _msaa = int(os.environ.get("LITHIUM_MSAA", "4"))
+        except ValueError:
+            _msaa = 4
+        glfw.window_hint(glfw.SAMPLES, max(0, _msaa))
 
         # HiDPI: render the framebuffer at the monitor's *native* pixel
         # resolution instead of letting the compositor upscale a
@@ -2490,6 +2501,11 @@ class App:
                     self._update_tool_cursor()
                     self._render_frame()
                     self._update_fps()
+                    # LITHIUM_FPS_LOG=<seconds>: print the fps counter to stdout
+                    # (for measuring on machines whose screen we cannot see).
+                    if self._fps_log_every > 0 and (time.time() - self._fps_log_t) >= self._fps_log_every:
+                        self._fps_log_t = time.time()
+                        print(f"[fps] {self.fps:.1f}  {self.width}x{self.height}", flush=True)
                     glfw.swap_buffers(self.window)
                 except KeyboardInterrupt:
                     raise

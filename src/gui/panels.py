@@ -423,7 +423,10 @@ def _draw_view_panel(app, show_bg: bool = True,
         # Fixed, compact: the panel used to stretch to the bottom of the
         # sidebar, which on a tall window left a huge empty band under the
         # cube and pushed INFER below the fold.
-        panel_h = th * 8.5
+        # Sized from the bar's WIDTH so the cube fills it edge to edge
+        # (cube ~0.9 w, plus the preset/alien row and margins).
+        _panel_w = imgui.get_content_region_available_width()
+        panel_h = _panel_w * 1.08 + th * 3.6
 
         preset = app.camera.active_preset
         is_planar = preset in PLANAR_PRESETS
@@ -2085,15 +2088,9 @@ def _draw_light_table_tab(app) -> bool:
     # Bottom-anchored layout: CLOUDS absorbs whatever the sections below it
     # did not use last frame, so the controls stack ends at the bottom edge
     # and RUN INFERENCE is always on screen.
-    _lt_avail = imgui.get_content_region_available()[1]
-    _lt_below = getattr(app, '_lt_below_clouds_h', None)
-    _lt_chrome = float(getattr(app, '_lt_clouds_chrome_h', th * 2.4))
-    _lt_flex = (None if _lt_below is None
-                else max(th * 3.0, _lt_avail - _lt_below - _lt_chrome - th * 0.4))
-    _lt_y0 = imgui.get_cursor_screen_pos()[1]
-    changed |= _draw_clouds_section(app, "##lt_clouds", height=_lt_flex)
-    _lt_y1 = imgui.get_cursor_screen_pos()[1]
-    app._lt_clouds_chrome_h = max(0.0, (_lt_y1 - _lt_y0) - float(getattr(app, '_lt_clouds_child_h', 0.0)))
+    # CLOUDS: ~10 rows by default; the handle under it pins a height,
+    # double-click on the handle returns to the default.
+    changed |= _draw_clouds_section(app, "##lt_clouds", height=th * 15.5)
 
     # --- VOLUME metadata (shown when selected cloud is volume-derived) ---
     if 0 <= app.selected_index < len(app.entries):
@@ -2148,6 +2145,19 @@ def _draw_light_table_tab(app) -> bool:
 
     # POINT SIZE / DISPLAY / DISPLAY MODE / CLIP / CAMERA — shared with
     # HOLOGRAM so visual tweaks transfer between workflows.
+
+    # Flexible spacer: whatever the controls stack (measured last frame)
+    # does not need is left empty here, so the stack ends at the bottom
+    # edge of the bar with RUN INFERENCE as the last thing.
+    _lt_stack_h = getattr(app, '_lt_stack_h', None)
+    if _lt_stack_h is not None:
+        _lt_spare = imgui.get_content_region_available()[1] - _lt_stack_h - th * 0.3
+        if _lt_spare > 0:
+            imgui.dummy(1, _lt_spare)
+    _lt_stack_y0 = imgui.get_cursor_screen_pos()[1]
+    changed |= _draw_viewport_view_controls(app)
+
+
     # --- INFER (cloud-constellation loader button, 1.1) ---
     # Runs the active project's model on the current cloud through the
     # same runner/namespace/undo path as batch inference.
@@ -2169,12 +2179,8 @@ def _draw_light_table_tab(app) -> bool:
         can_run=bool(_ckpt) and not _runner_busy,
         registry=app.label_registry,
     )
-
-    changed |= _draw_viewport_view_controls(app)
-
-
-    # Everything below the clouds list, measured for next frame's flex.
-    app._lt_below_clouds_h = imgui.get_cursor_screen_pos()[1] - _lt_y1
+    # Controls stack height (from the spacer to here), for next frame's spacer.
+    app._lt_stack_h = imgui.get_cursor_screen_pos()[1] - _lt_stack_y0
     return changed
 
 
