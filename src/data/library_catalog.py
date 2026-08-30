@@ -39,6 +39,11 @@ SMART_ALL = "smart:all"
 SMART_RECENT = "smart:recent"
 SMART_MISSING = "smart:missing"
 
+# The SANDBOX pseudo-project (see src/data/sandbox.py): always offered in
+# the UI, created on disk on first use, never deletable, owns no labels.
+SANDBOX_PROJECT_ID = "proj:sandbox"
+SANDBOX_NAME = "SANDBOX"
+
 # Preview defaults
 PREVIEW_POINTS = 50_000
 RECENT_LIMIT = 50
@@ -937,7 +942,13 @@ class LibraryCatalog:
         self._save_projects()
         return new_proj
 
+    def user_projects(self) -> list["Project"]:
+        """Every project except the SANDBOX pseudo-project."""
+        return [p for pid, p in self.projects.items() if pid != SANDBOX_PROJECT_ID]
+
     def delete_project(self, project_id: str) -> None:
+        if project_id == SANDBOX_PROJECT_ID:
+            return  # the sandbox always exists; its layers are cloud-level
         if project_id in self.projects:
             del self.projects[project_id]
             # SC-07: drop the per-project model registry file so a

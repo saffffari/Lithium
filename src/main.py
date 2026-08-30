@@ -324,6 +324,9 @@ class App:
         # project. _sync_project_state swaps the registry in/out when
         # active_view changes.
         self.label_registry = LabelRegistry()
+        # SANDBOX: model_id of the cloud-level layer currently shown
+        # (None = clouds render unlabeled). See src/data/sandbox.py.
+        self._sandbox_layer: str | None = None
         self.undo_stack = UndoStack()
         self.active_label_id: int = 0
         self.label_blend: float = 1.0  # 0 = vertex colors, 1 = label colors.
@@ -1762,12 +1765,15 @@ class App:
         self._ensure_catalog()
         if self.catalog is None:
             return
+        from src.data import sandbox as _sb
 
         if view is None:
             target_entries = []
         elif view[0] == "folder":
             target_entries = self.catalog.entries_in_folder(view[1], recursive=True)
         elif view[0] == "project":
+            if _sb.is_sandbox(view[1]):
+                _sb.ensure_sandbox(self.catalog)
             target_entries = self.catalog.entries_in_project(view[1])
         else:
             target_entries = []
@@ -1780,7 +1786,11 @@ class App:
         # Outgoing labels need no flush here: every stroke is
         # saved-through at paint time under the then-active namespace.
         from src.data import cloud_store as _cs
-        if view is not None and view[0] == "project" \
+        if view is not None and view[0] == "project" and _sb.is_sandbox(view[1]):
+            # SANDBOX: labels come from the selected cloud-level layer
+            # (a model's predictions), never from a project namespace.
+            _cs.set_active_label_namespace(_sb.layer_namespace(self._sandbox_layer))
+        elif view is not None and view[0] == "project" \
                 and view[1] in self.catalog.projects:
             _cs.set_active_label_namespace(view[1])
         else:
@@ -5010,7 +5020,21 @@ class App:
             with no callback, so mutations can't happen anyway
         """
         proj = self._project_for_view(view)
-        if proj is not None:
+        from src.data import sandbox as _sb
+        if proj is not None and _sb.is_sandbox(proj.id):
+            # SANDBOX: read-only registry mirroring the selected layer's
+            # class list (ids == the model's class indices); colours
+            # borrowed by name from the project that trained the model.
+            meta = _sb.read_layer_meta(self._sandbox_layer) or {}
+            palette = None
+            src_id = meta.get("source_project_id") or ""
+            src_proj = self.catalog.projects.get(src_id) if (src_id and self.catalog) else None
+            if src_proj is not None and src_proj.ontology_data is not None:
+                palette = LabelRegistry.from_json(src_proj.ontology_data)
+            self.label_registry = _sb.registry_for_layer(
+                list(meta.get("class_names", [])), palette)
+            self.label_registry._on_change_callback = None
+        elif proj is not None:
             if proj.ontology_data is not None:
                 self.label_registry = LabelRegistry.from_json(proj.ontology_data)
             else:
@@ -5062,6 +5086,32 @@ class App:
             return
         if self.catalog is not None:
             self.catalog.update_project_ontology(proj.id, registry.to_json())
+
+    def set_sandbox_layer(self, model_id: str | None) -> None:
+        """SANDBOX: show a different cloud-level layer (one model's
+        predictions). Rebinds the label namespace + registry, re-reads
+        labels for the current view and keeps the user where they were.
+        """
+        from src.data import sandbox as _sb
+        from src.core.modes import MODE_LIGHT_TABLE as _LT
+        model_id = model_id or None
+        view = self.active_view
+        in_sandbox = bool(view and view[0] == "project" and _sb.is_sandbox(view[1]))
+        if model_id == self._sandbox_layer and in_sandbox:
+            return
+        self._sandbox_layer = model_id
+        if not in_sandbox:
+            return
+        idx, mode = self.selected_index, self.mode
+        self.set_active_view(view)      # rebinds namespace, drops stale label buffers
+        self._sync_project_state(view)
+        if 0 <= idx < len(self.entries):
+            self.selected_index = idx
+            if mode == _LT:
+                self._on_cloud_selected(idx, enter_light_table=True)
+        if self.cli:
+            meta = _sb.read_layer_meta(model_id) or {}
+            self.cli.log(f"Sandbox layer: {meta.get('model_name') or model_id or 'none'}", "info")
 
     def _project_for_view(self, view: tuple[str, str] | None):
         """Return the Project for a view tuple, or None."""

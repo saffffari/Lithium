@@ -28,6 +28,7 @@ from src.gui.op1_widgets import (
 )
 from src.gui.op1_wireframe import op1_camera_cube, op1_sphere_size_gauge, op1_clip_fader_panel
 from src.gui.label_panel import draw_label_panel
+from src.data.library_catalog import SANDBOX_PROJECT_ID
 
 
 # 3-mode tab order (browse → label → train). Names short enough to fit
@@ -837,6 +838,10 @@ def _draw_ontology_picker(app) -> bool:
         catalog = getattr(app, 'catalog', None)
         if catalog is not None:
             col = catalog.projects.get(view[1])
+            if col is not None and col.id == SANDBOX_PROJECT_ID:
+                imgui.text_colored("SANDBOX \u2014 no ontology; layers carry their own classes",
+                                   *OP1_GRAY[:3])
+                return False
 
     # Only show for user projects (not smart views / folder views)
     is_user_col = col is not None and not view[1].startswith("__")
@@ -1009,7 +1014,8 @@ def _draw_library_panel(app):
     # Divider before user projects
     if catalog.projects:
         imgui.dummy(1, s(4))
-    for cid, col in sorted(catalog.projects.items(), key=lambda kv: kv[1].name.lower()):
+    for col in sorted(catalog.user_projects(), key=lambda p: p.name.lower()):
+        cid = col.id
         _library_row(app, col.name, len(col.file_keys), OP1_GREEN,
                      ("project", cid), indent=th * 0.6,
                      is_smart=False, project_id=cid)
@@ -1039,6 +1045,19 @@ def _draw_library_panel(app):
     else:
         if _styled_button("+ NEW PROJECT", OP1_DIM, height_units=1.6):
             _show_new_project = True
+
+    # ---------------- SANDBOX ----------------
+    # Always offered, created on disk on first use. Its own section and
+    # colour on purpose: it is NOT a project — no ontology, no labels of
+    # its own. Any model runs on any cloud here; results are cloud-level
+    # layers (src/data/sandbox.py).
+    imgui.spacing()
+    _sb_tint = (OP1_ORANGE[0] * 0.10, OP1_ORANGE[1] * 0.10, OP1_ORANGE[2] * 0.10, 1.0)
+    op1_section("SANDBOX", OP1_ORANGE, fill_color=_sb_tint, collapsible=False)
+    _sb_proj = catalog.projects.get(SANDBOX_PROJECT_ID)
+    _library_row(app, "Sandbox \u00b7 any model on any cloud",
+                 len(_sb_proj.file_keys) if _sb_proj else 0, OP1_ORANGE,
+                 ("project", SANDBOX_PROJECT_ID), indent=th * 0.6, is_smart=True)
 
     imgui.spacing()
     # FOLDERS panel removed — filesystem tree browser lived here but
@@ -1679,6 +1698,7 @@ def _draw_inference_section(app) -> None:
     runner = getattr(app, 'contact_sheets_infer_runner', None)
     is_running = runner is not None and runner.running
     multi_set: set[int] = set(_train_selected)
+    _draw_sandbox_layer_picker(app)
 
     # ---- status line + progress bar ----
     if is_running and runner.current is not None:
@@ -2054,6 +2074,7 @@ def _draw_light_table_tab(app) -> bool:
     # Runs the active project's model on the current cloud through the
     # same runner/namespace/undo path as batch inference.
     from src.gui.infer_widget import draw_light_table_infer
+    _draw_sandbox_layer_picker(app)
     _ckpt = _resolve_inference_checkpoint(app)
     _project_id = _resolve_active_project_id(app)
     _chosen = _resolve_inference_model(app, _project_id) if _ckpt else None
@@ -2312,7 +2333,10 @@ def _draw_train_tab(app):
       [LOG]    shared CLI output pane (commands still work below)
     """
     th = imgui.get_text_line_height()
-
+    if _resolve_active_project_id(app) == SANDBOX_PROJECT_ID:
+        imgui.text_colored("SANDBOX \u2014 inference playground. Exports here carry the", *OP1_ORANGE[:3])
+        imgui.text_colored("selected layer's classes; pick a project to train.", *OP1_GRAY[:3])
+        imgui.spacing()
 
     # --- SELECT: mini-gallery ---
     op1_section("SELECT CLOUDS", TEAL)
@@ -3674,11 +3698,30 @@ def _draw_gallery_ctx_popup(app):
 
             # Add to project — submenu over user-owned projects.
             catalog = getattr(app, 'catalog', None)
+            # SANDBOX: send / remove — membership only, no labels move.
+            from src.data import sandbox as _sb
+            _av = getattr(app, 'active_view', None)
+            _in_sandbox = bool(_av and _av[0] == "project" and _sb.is_sandbox(_av[1]))
+            _sb_keys = [app.entries[i].file_key for i in targets
+                        if app.entries[i].file_key is not None]
+            if catalog is not None and _sb_keys:
+                _send_label = (f"Send {len(_sb_keys)} to Sandbox" if len(_sb_keys) > 1
+                               else "Send to Sandbox")
+                if not _in_sandbox and imgui.menu_item(_send_label)[0]:
+                    _sb.ensure_sandbox(catalog)
+                    catalog.add_to_project(SANDBOX_PROJECT_ID, _sb_keys)
+                    if app.cli:
+                        app.cli.log(f"Sent {len(_sb_keys)} cloud(s) to SANDBOX", "ok")
+                    imgui.close_current_popup()
+                elif _in_sandbox and imgui.menu_item("Remove from Sandbox")[0]:
+                    catalog.remove_from_project(SANDBOX_PROJECT_ID, _sb_keys)
+                    imgui.close_current_popup()
+                    imgui.end_popup()
+                    app.set_active_view(_av)  # entries change: leave the menu now
+                    return
             user_cols = []
             if catalog is not None:
-                user_cols = [
-                    c for c in catalog.projects.values()
-                ]
+                user_cols = list(catalog.user_projects())
             add_label = (f"Add {len(targets)} to project"
                          if len(targets) > 1 else "Add to project")
             if imgui.begin_menu(add_label, bool(user_cols)):
@@ -3946,7 +3989,64 @@ def _inference_eligible_models(app, project_id: str | None) -> list:
     registry = getattr(app, '_train_model_registry', None)
     if not project_id or registry is None:
         return []
-    return [m for m in registry.list_models(project_id) if m.has_checkpoint]
+    from src.data import sandbox as _sb
+    catalog = getattr(app, 'catalog', None)
+    own = [m for m in registry.list_models(project_id) if m.has_checkpoint]
+    for m in own:
+        m._source_project = ""
+        m._source_project_id = project_id
+    if catalog is None:
+        return own
+    other_pids = [p for p in catalog.projects if p != project_id]
+    if _sb.is_sandbox(project_id):
+        # SANDBOX: every model with a checkpoint, from every project.
+        out = list(own)
+        seen = {m.model_id for m in own}
+        for pid, m in registry.all_models(other_pids):
+            if m.model_id in seen or not m.has_checkpoint:
+                continue
+            seen.add(m.model_id)
+            m._source_project = catalog.projects[pid].name
+            m._source_project_id = pid
+            out.append(m)
+        return out
+    # Normal project: own models first, then any other project's model
+    # whose predicted classes all exist here by name (1.2).
+    names = [info.name for info in app.label_registry.all_labels() if info.id != 0]
+    if not names:
+        return own
+    out = list(own)
+    seen = {m.model_id for m in own}
+    for pid, m in registry.all_models(other_pids):
+        if m.model_id in seen or not m.has_checkpoint:
+            continue
+        if _sb.models_compatible(names, _model_class_names(m)):
+            seen.add(m.model_id)
+            m._source_project = catalog.projects[pid].name
+            m._source_project_id = pid
+            out.append(m)
+    return out
+
+
+def _model_class_names(model) -> list[str]:
+    """Ordered class names a registry model predicts (index == class id):
+    the frozen ``class_map`` when present, else the ``classes.json`` next
+    to its checkpoint. Cached on the model object."""
+    cached = getattr(model, '_class_names_cache', None)
+    if cached is not None:
+        return cached
+    from src.data.sandbox import class_names_from_model
+    names = class_names_from_model(model)
+    if not names and getattr(model, 'best_checkpoint', ''):
+        cj = _find_classes_json_for_checkpoint(model.best_checkpoint)
+        if cj:
+            try:
+                with open(cj) as f:
+                    names = list(json.load(f).get("class_names", []))
+            except Exception:
+                names = []
+    model._class_names_cache = names
+    return names
 
 
 def _auto_best_inference_model(models: list):
@@ -4000,6 +4100,37 @@ def _resolve_inference_model(app, project_id: str | None):
     return _auto_best_inference_model(eligibles)
 
 
+def _draw_sandbox_layer_picker(app) -> None:
+    """SANDBOX only: pick which cloud-level layer (a model's output) is
+    shown. Switching re-reads labels through that layer's namespace."""
+    from src.data import sandbox as _sb
+    project_id = _resolve_active_project_id(app)
+    if not _sb.is_sandbox(project_id):
+        return
+    layers = _sb.list_layers()
+    items = ["(no layer \u2014 clouds show unlabeled)"]
+    ids: list = [None]
+    for m in layers:
+        n = max(0, len(m.get("class_names", [])) - 1)
+        src = f" \u00b7 from {m['source_project_name']}" if m.get("source_project_name") else ""
+        items.append(f"{m.get('model_name') or m['model_id']} \u00b7 {n}cls{src}")
+        ids.append(m["model_id"])
+    cur = getattr(app, '_sandbox_layer', None)
+    idx = ids.index(cur) if cur in ids else 0
+    imgui.text_colored("LAYER", *OP1_ORANGE[:3])
+    imgui.push_item_width(-1)
+    changed, new_idx = imgui.combo("##sandbox_layer_pick", idx, items)
+    imgui.pop_item_width()
+    if changed and 0 <= new_idx < len(ids) and ids[new_idx] != cur:
+        app.set_sandbox_layer(ids[new_idx])
+    if 0 <= app.selected_index < len(app.entries):
+        fk = app.entries[app.selected_index].file_key
+        if fk:
+            have = _sb.layers_for_cloud(fk)
+            imgui.text_colored(f"  {len(have)} layer(s) exist for this cloud", *OP1_GRAY[:3])
+    imgui.spacing()
+
+
 def _draw_inference_model_picker(app) -> None:
     """Dropdown above RUN INFERENCE listing every eligible model for
     the active project. Selection drives ``_resolve_inference_model``
@@ -4038,7 +4169,9 @@ def _draw_inference_model_picker(app) -> None:
     for m in eligibles:
         miou_str = f" — mIoU {m.best_miou:.2f}" if m.best_miou > 0 else ""
         cls_str = f" · {m.num_classes}cls" if m.num_classes else ""
-        items.append(f"{m.name}{miou_str}{cls_str}")
+        src_str = (f" · from {m._source_project}"
+                   if getattr(m, '_source_project', '') else "")
+        items.append(f"{m.name}{miou_str}{cls_str}{src_str}")
         item_model_ids.append(m.model_id)
 
     current_idx = 0
@@ -4163,19 +4296,20 @@ def _resolve_inference_class_map(
 
     # 0. Frozen class_map on the registry entry that owns this checkpoint.
     if checkpoint_path and getattr(app, '_train_model_registry', None):
+        # 1.2: the model may live in another project's registry
+        # (cross-project inference / SANDBOX) — search all of them,
+        # active project first.
         project_id = _resolve_active_project_id(app)
-        if project_id:
-            for m in app._train_model_registry.list_models(project_id):
-                if (m.class_map
-                        and checkpoint_path in (m.best_checkpoint,
-                                                m.last_checkpoint)):
-                    try:
-                        ordered = sorted(m.class_map.items(),
-                                         key=lambda kv: int(kv[0]))
-                        classes_name_order = [name for _k, name in ordered]
-                    except (ValueError, TypeError):
-                        classes_name_order = []
-                    break
+        catalog = getattr(app, 'catalog', None)
+        pids = [project_id] if project_id else []
+        if catalog is not None:
+            pids += [p for p in catalog.projects if p not in pids]
+        for _pid, m in app._train_model_registry.all_models(pids):
+            if m.class_map and checkpoint_path in (m.best_checkpoint,
+                                                   m.last_checkpoint):
+                from src.data.sandbox import class_names_from_model
+                classes_name_order = class_names_from_model(m)
+                break
 
     # 1. Co-located with the checkpoint — authoritative.
     if not classes_name_order and checkpoint_path:
@@ -4629,7 +4763,30 @@ def _start_batch_inference(app, indices: list[int]) -> bool:
     # classes.json next to the training run, not from the current
     # working directory — that prevented per-project ontology drift
     # from being silently misinterpreted as the checkpoint's class list.
-    cmap = _resolve_inference_class_map(app, checkpoint)
+    from src.data import sandbox as _sb
+    _pid = _resolve_active_project_id(app)
+    if _sb.is_sandbox(_pid):
+        # SANDBOX: predictions land in the chosen model's cloud-level
+        # layer with ids == the model's class indices — no ontology
+        # translation, nothing written to any project.
+        chosen = _resolve_inference_model(app, _pid)
+        names = _model_class_names(chosen) if chosen is not None else []
+        if chosen is None or not names:
+            if app.cli:
+                app.cli.log("Sandbox: this model has no class map — cannot run it here.", "error")
+            return False
+        catalog = getattr(app, 'catalog', None)
+        src_pid = getattr(chosen, '_source_project_id', '') or ''
+        src_name = (catalog.projects[src_pid].name
+                    if catalog is not None and src_pid in catalog.projects else '')
+        _sb.write_layer_meta(chosen.model_id, names, model_name=chosen.name,
+                             source_project_id=src_pid, source_project_name=src_name,
+                             checkpoint=chosen.best_checkpoint,
+                             architecture=getattr(chosen, 'architecture', ''))
+        app.set_sandbox_layer(chosen.model_id)
+        cmap = (names, np.arange(len(names), dtype=np.int32))
+    else:
+        cmap = _resolve_inference_class_map(app, checkpoint)
     if cmap is None:
         if app.cli:
             app.cli.log("No classes found for inference mapping.", "error")

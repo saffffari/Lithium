@@ -105,6 +105,26 @@ Inspect and correct, re-propagate from the corrected frame.
 
 ---
 
+## Sandbox and cross-project models (1.2)
+
+Projects are the organising tool: one ontology, one label namespace each.
+Two things loosen that without making labels a mess:
+
+- **Any compatible model runs in a project.** The MODEL picker above INFER
+  lists the project's own models first, then every model from any other
+  project whose predicted classes all exist here by name (shown as
+  `· from <project>`). Predictions are translated by class name into the
+  project's ids exactly as before.
+- **SANDBOX** — always present, its own section and colour in the projects
+  list. Right-click clouds in the gallery → **Send to Sandbox**. The sandbox
+  has no ontology and no labels of its own: INFER offers *every* model in
+  the catalog, and each model's predictions are stored as a **cloud-level
+  layer** (`labels/layer:<model_id>/`, with a `_layer.json` describing the
+  model and its classes). The LAYER picker above INFER switches which
+  model's output you are looking at; layers follow the cloud, not the
+  project, and never touch a project's labels. Remove clouds with
+  right-click → Remove from Sandbox. The sandbox cannot be deleted.
+
 ## Training (TRAIN tab inside AUTOMATION)
 
 ```

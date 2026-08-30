@@ -246,6 +246,20 @@ class ProjectModelRegistry:
                 return m
         return None
 
+    def all_models(self, project_ids) -> list[tuple[str, TrainedModel]]:
+        """``(project_id, model)`` for every model across ``project_ids``,
+        newest-first within each project, de-duplicated by ``model_id``
+        (duplicated projects share model records by reference)."""
+        out: list[tuple[str, TrainedModel]] = []
+        seen: set[str] = set()
+        for pid in project_ids:
+            for m in self.list_models(pid):
+                if m.model_id in seen:
+                    continue
+                seen.add(m.model_id)
+                out.append((pid, m))
+        return out
+
     def list_models(self, project_id: str) -> list[TrainedModel]:
         """Return all models for a project (most recent first)."""
         models = self.load(project_id)

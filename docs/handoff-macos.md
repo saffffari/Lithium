@@ -23,7 +23,7 @@ a first-class target and the `.app`/`.dmg` job gets added to
    ```bash
    python3.12 -m venv .venv && source .venv/bin/activate
    pip install -r requirements-lock.txt
-   python -m pytest tests -q     # expect 210 passed, 3 skipped
+   python -m pytest tests -q     # expect 217 passed, 3 skipped
    ```
    Failures here are real cross-platform bugs — fix and commit.
 2. **wgpu spike sanity** — `pip install wgpu rendercanvas`, then run

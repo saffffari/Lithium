@@ -30,6 +30,9 @@ portfolio. Free.*
 - **The catalog is the dataset** — every stroke persists atomically; there is
   no "save" button to forget
 - **Undo/redo for every label operation**, including applied inference
+- **Sandbox + cross-project models** — send any cloud to the always-present
+  SANDBOX and run any registered model on it; results live as cloud-level
+  layers. In a project, any model whose classes match the ontology is offered.
 - **In-app PT-v3 training** ([Pointcept](https://github.com/Pointcept/Pointcept))
   with model registry, frozen class maps, fine-tune lineage, and
   crash-resilient training
