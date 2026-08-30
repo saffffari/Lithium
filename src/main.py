@@ -578,6 +578,11 @@ class App:
         # User mode: 'researcher' (default, all 6 tabs) or 'clinician'
         # (Imaging / Hologram / Overwatch only). Persisted across sessions.
         self.user_mode: str = str(prefs.get("user_mode", "researcher"))
+        # User UI-scale multiplier on top of the monitor's content scale
+        # (Ctrl/Cmd + '+' / '-' / '0'). Persisted; applied through the same
+        # font-atlas rebuild path a monitor change uses.
+        self.ui_scale_user: float = min(3.0, max(0.5, float(prefs.get("ui_scale", 1.0))))
+        self._content_scale_base: float = 1.0
         if self.user_mode not in ("researcher", "clinician"):
             self.user_mode = "researcher"
         self.point_size = float(prefs.get("point_size", self.point_size))
@@ -886,6 +891,10 @@ class App:
 
     def init_gui(self):
         self.gui = ImGuiLayer(self.window)
+        from src.gui.scale import get_scale as _get_scale
+        self._content_scale_base = _get_scale()
+        if abs(self.ui_scale_user - 1.0) > 1e-6:
+            self._pending_content_scale = self._content_scale_base * self.ui_scale_user
 
     def _gallery_filter_ready(self) -> list:
         """Return the entries that should appear in the Contact Sheets
@@ -6201,7 +6210,27 @@ class App:
 
     def _on_content_scale(self, window, sx, sy):
         """Record a monitor scale change; the frame loop applies it."""
-        self._pending_content_scale = max(sx, sy, 0.5)
+        self._content_scale_base = max(sx, sy, 0.5)
+        self._pending_content_scale = self._content_scale_base * self.ui_scale_user
+
+    def _bump_ui_scale(self, direction: int) -> None:
+        """Ctrl/Cmd +, - and 0: grow / shrink / reset the UI scale in 10 % steps."""
+        from src.utils.prefs import update_prefs
+        if direction == 0:
+            new = 1.0
+        else:
+            new = self.ui_scale_user * (1.1 if direction > 0 else 1 / 1.1)
+        new = round(min(3.0, max(0.5, new)), 3)
+        if abs(new - self.ui_scale_user) < 1e-6:
+            return
+        self.ui_scale_user = new
+        self._pending_content_scale = self._content_scale_base * new
+        try:
+            update_prefs({"ui_scale": new})
+        except Exception:
+            pass
+        if getattr(self, "cli", None):
+            self.cli.log(f"UI scale {new * 100:.0f}%", "info")
 
     def _on_focus(self, window, focused):
         """Reset all drag states when the window loses focus.
@@ -6972,6 +7001,13 @@ class App:
                 self.mode = MODE_CONTACT_SHEETS
             elif self.mode == MODE_CONTACT_SHEETS:
                 self.mode = MODE_LIGHT_TABLE
+        # Ctrl (Cmd on macOS) + '+' / '-' / '0': UI scale up / down / reset.
+        elif key in (glfw.KEY_EQUAL, glfw.KEY_KP_ADD) and (mods & (glfw.MOD_CONTROL | glfw.MOD_SUPER)):
+            self._bump_ui_scale(+1)
+        elif key in (glfw.KEY_MINUS, glfw.KEY_KP_SUBTRACT) and (mods & (glfw.MOD_CONTROL | glfw.MOD_SUPER)):
+            self._bump_ui_scale(-1)
+        elif key == glfw.KEY_0 and (mods & (glfw.MOD_CONTROL | glfw.MOD_SUPER)):
+            self._bump_ui_scale(0)
         # Number keys map to tabs in workflow order: 1=SHEETS, 2=LIGHT, 3=TRAIN
         elif key == glfw.KEY_1 and not (mods & glfw.MOD_CONTROL):
             self.mode = MODE_CONTACT_SHEETS

@@ -115,7 +115,10 @@ def op1_camera_cube(camera, active_preset: str | None = None,
     w = width if width is not None else imgui.get_content_region_available_width()
     th = imgui.get_text_line_height()
 
-    size = th * size_units
+    # Never wider than the column it sits in: the panel hands us the
+    # leftover sidebar *height*, which on a tall window can be several
+    # times the sidebar width and made the cube balloon past the rail.
+    size = min(th * size_units, w * 0.9)
     # Center the cube horizontally; leave some vertical padding
     cx = wx + w * 0.5
     cy = wy + size * 0.55

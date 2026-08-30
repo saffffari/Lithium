@@ -149,6 +149,7 @@ Training runs in a sidecar Pointcept subprocess in the `lithium-ptv3` conda env 
 | Shift+G | Toggle grid floor |
 | Space | Fit camera to view |
 | Ctrl+E | Export screenshot |
+| Ctrl/⌘ + / − / 0 | UI scale up / down / reset (persisted) |
 | Ctrl+Shift+E | Spin render |
 | Esc | Back to gallery / quit |
 

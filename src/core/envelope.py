@@ -133,7 +133,11 @@ class Envelope:
 
     @classmethod
     def hard_circle(cls) -> 'Envelope':
-        return cls([(0.0, 1.0), (0.99, 1.0), (1.0, 0.0)])
+        # Truly flat. The old (0.99, 1.0) -> (1.0, 0.0) drop was an alpha
+        # feather from before splats became opaque; with alpha forced to 1
+        # it only painted a dark 1-2 px rim on every disc, which reads as a
+        # light outline stroke against the neighbouring splat.
+        return cls([(0.0, 1.0), (1.0, 1.0)])
 
     @classmethod
     def soft_bell(cls) -> 'Envelope':
@@ -147,5 +151,7 @@ def envelope_from_softness(softness: float) -> 'Envelope':
     softness=1 → linear falloff from 1.0 to 0.0
     """
     s = max(0.0, min(1.0, float(softness)))
+    if s <= 1e-6:
+        return Envelope.hard_circle()
     knee = 1.0 - s * 0.99
     return Envelope([(0.0, 1.0), (knee, 1.0), (1.0, 0.0)])

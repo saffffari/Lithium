@@ -164,6 +164,11 @@ class ImGuiLayer:
             os.path.expandvars(r"%WINDIR%\Fonts\segoeui.ttf"),
             os.path.expandvars(r"%WINDIR%\Fonts\consola.ttf"),
             os.path.expandvars(r"%WINDIR%\Fonts\arial.ttf"),
+            # macOS — plain TrueType first (stb_truetype-safe), then the
+            # Helvetica collection (first face = Regular).
+            "/System/Library/Fonts/Supplemental/Arial.ttf",
+            "/System/Library/Fonts/Supplemental/Verdana.ttf",
+            "/System/Library/Fonts/Helvetica.ttc",
             # Linux (X11/Wayland) — common sans fonts across distros.
             "/usr/share/fonts/noto/NotoSans-Regular.ttf",
             "/usr/share/fonts/liberation/LiberationSans-Regular.ttf",
@@ -189,6 +194,9 @@ class ImGuiLayer:
             os.path.expandvars(r"%WINDIR%\Fonts\segoeuisl.ttf"),    # Segoe UI Semilight
             os.path.expandvars(r"%WINDIR%\Fonts\bahnschrift.ttf"),
             os.path.expandvars(r"%WINDIR%\Fonts\arial.ttf"),
+            # macOS — Helvetica Neue (first face = Regular), then Arial.
+            "/System/Library/Fonts/HelveticaNeue.ttc",
+            "/System/Library/Fonts/Supplemental/Arial.ttf",
             # Linux — light/geometric display fonts, falling back to plain sans.
             "/usr/share/fonts/TTF/FiraSansCondensed-UltraLight.ttf",
             "/usr/share/fonts/noto/NotoSans-Light.ttf",

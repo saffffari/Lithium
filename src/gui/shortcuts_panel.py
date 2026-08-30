@@ -39,6 +39,7 @@ SHORTCUTS = [
         ("Ctrl + scroll", "Adjust brush radius / depth limit"),
         ("Enter", "Apply active label"),
         ("Ctrl+Z / Ctrl+Shift+Z", "Undo / Redo"),
+        ("Ctrl/Cmd + / - / 0", "UI scale up / down / reset"),
         ("L", "Toggle label color view"),
     ]),
     ("OVERLAYS", []),
