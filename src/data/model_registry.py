@@ -88,7 +88,19 @@ class TrainedModel:
 
     @property
     def has_checkpoint(self) -> bool:
-        return bool(self.best_checkpoint) and os.path.isfile(self.best_checkpoint)
+        """Checkpoint file present? Cached for a few seconds: the picker
+        asks every frame for every model, and a stat of an absent path
+        costs ~3 ms on macOS (26 models x several calls = seconds/frame)."""
+        if not self.best_checkpoint:
+            return False
+        import time as _t
+        now = _t.monotonic()
+        c = self.__dict__.get("_ckpt_cache")
+        if c is not None and c[0] == self.best_checkpoint and now - c[1] < 5.0:
+            return c[2]
+        ok = os.path.isfile(self.best_checkpoint)
+        self.__dict__["_ckpt_cache"] = (self.best_checkpoint, now, ok)
+        return ok
 
     @property
     def display_status(self) -> str:

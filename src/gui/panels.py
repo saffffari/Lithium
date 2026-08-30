@@ -4079,6 +4079,18 @@ def _resolve_active_project_id(app) -> str | None:
 
 
 def _inference_eligible_models(app, project_id: str | None) -> list:
+    """Memoised (1 s) front for :func:`_inference_eligible_models_uncached` —
+    asked several times per frame and it walks every project's registry."""
+    memo = getattr(app, '_eligible_models_memo', None)
+    now = time.perf_counter()
+    if memo is not None and memo[0] == project_id and now - memo[1] < 1.0:
+        return memo[2]
+    out = _inference_eligible_models_uncached(app, project_id)
+    app._eligible_models_memo = (project_id, now, out)
+    return out
+
+
+def _inference_eligible_models_uncached(app, project_id: str | None) -> list:
     """Return models that can drive an inference run, newest first.
 
     Eligibility = the model has a ``best_checkpoint`` path that still
@@ -4086,6 +4098,8 @@ def _inference_eligible_models(app, project_id: str | None) -> list:
     Failed runs that never reached the first eval are filtered out
     because they never produced a checkpoint to point at.
     """
+    # Per-frame memo: this is asked several times per frame (light table
+    # INFER, picker, sheets) and walks every project's registry.
     registry = getattr(app, '_train_model_registry', None)
     if registry is None and project_id:
         # Lazy-init here, not only in the TRAIN tab's picker: the Light

@@ -307,7 +307,7 @@ class LibraryCatalog:
         # out of the source folder and back sees the right state, long
         # enough to amortise stat() across ~120 frames.
         self._exists_cache: dict[str, tuple[float, bool]] = {}
-        self._exists_ttl: float = 2.0
+        self._exists_ttl: float = 20.0  # was 2.0: a stat of an absent path is ~3 ms on macOS
 
         self._load_index()
         self._load_projects()
