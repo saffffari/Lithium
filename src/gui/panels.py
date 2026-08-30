@@ -1865,11 +1865,21 @@ def _unlabelled_entry_indices(app) -> list[int]:
     visible.
     """
     from src.data.cloud_store import cloud_labels_path
-    return [
+    # Cached for a second: this ran every frame the INFER panel was
+    # visible, i.e. one stat per cloud per frame — 247 stats/frame took
+    # the Mac from 60 fps to 6 (APFS stats are slow from Python).
+    now = time.perf_counter()
+    cache = getattr(app, "_unlabeled_entries_cache", None)
+    if cache is not None and cache[1] is app.entries and cache[2] == len(app.entries) \
+            and now - cache[0] < 1.0:
+        return cache[3]
+    out = [
         i for i, e in enumerate(app.entries)
         if getattr(e, "file_key", "")
         and not cloud_labels_path(e.file_key).exists()
     ]
+    app._unlabeled_entries_cache = (now, app.entries, len(app.entries), out)
+    return out
 
 
 def _draw_selected_details(app, entry):

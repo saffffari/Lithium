@@ -1839,7 +1839,12 @@ class App:
             if not os.path.exists(preview_path) and lib_entry.exists():
                 self.catalog.queue_preview_build(lib_entry)
 
-            self.catalog.touch(lib_entry.file_key)
+            # Touch without saving: catalog.touch() rewrites index.json per
+            # call, which made opening a 247-cloud project write the whole
+            # index 247 times (12 s on the Mac). One save after the loop.
+            lib_entry.last_opened = time.time()
+        if target_entries:
+            self.catalog._save_index()
 
         self.active_view = view
         self.mode = MODE_CONTACT_SHEETS
