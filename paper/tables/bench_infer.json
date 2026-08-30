@@ -1,0 +1,59 @@
+{
+ "gpu": "NVIDIA GeForce RTX 4090",
+ "checkpoint": "training/runs/sonata_full6_gold247_v1/model/model_best.pth",
+ "n_bones": 6,
+ "runs": [
+  {
+   "scene": "val/scene_000",
+   "cloud": "sub-verse631_C3.ply",
+   "points": 32000,
+   "model_load_s": 7.6,
+   "inference_s": 1.3,
+   "wall_s": 10.401946735015372
+  },
+  {
+   "scene": "val/scene_001",
+   "cloud": "sub-verse631_C4.ply",
+   "points": 32000,
+   "model_load_s": 7.8,
+   "inference_s": 2.26,
+   "wall_s": 11.443677071976708
+  },
+  {
+   "scene": "val/scene_002",
+   "cloud": "sub-verse631_C5.ply",
+   "points": 32000,
+   "model_load_s": 7.5,
+   "inference_s": 1.06,
+   "wall_s": 9.934192335989792
+  },
+  {
+   "scene": "val/scene_003",
+   "cloud": "sub-verse631_C6.ply",
+   "points": 32000,
+   "model_load_s": 8.1,
+   "inference_s": 2.48,
+   "wall_s": 12.008806411002297
+  },
+  {
+   "scene": "val/scene_004",
+   "cloud": "sub-verse631_C7.ply",
+   "points": 32000,
+   "model_load_s": 8.0,
+   "inference_s": 2.77,
+   "wall_s": 12.108068356988952
+  },
+  {
+   "scene": "val/scene_005",
+   "cloud": "sub-verse631_L1.ply",
+   "points": 32000,
+   "model_load_s": 8.2,
+   "inference_s": 2.61,
+   "wall_s": 12.24148429100751
+  }
+ ],
+ "inference_s_median": 2.37,
+ "model_load_s_median": 7.9,
+ "wall_s_median": 11.726241741489503,
+ "points_mean": 32000
+}

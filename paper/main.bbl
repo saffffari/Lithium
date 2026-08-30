@@ -1,0 +1,124 @@
+\begin{thebibliography}{13}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Berg et~al.(2019)Berg, Kutra, Kroeger, Straehle, Kausler, Haubold,
+  Schiegg, Ales, Beier, Rudy, Eren, Cervantes, Xu, Beuttenmueller, Wolny,
+  Zhang, Koethe, Hamprecht, and Kreshuk]{berg2019ilastik}
+Stuart Berg, Dominik Kutra, Thorben Kroeger, Christoph~N. Straehle, Bernhard~X.
+  Kausler, Carsten Haubold, Martin Schiegg, Janez Ales, Thorsten Beier, Markus
+  Rudy, Kemal Eren, Jaime~I. Cervantes, Buote Xu, Fynn Beuttenmueller, Adrian
+  Wolny, Chong Zhang, Ullrich Koethe, Fred~A. Hamprecht, and Anna Kreshuk.
+\newblock ilastik: interactive machine learning for (bio)image analysis.
+\newblock \emph{Nature Methods}, 16:\penalty0 1226--1232, 2019.
+\newblock \doi{10.1038/s41592-019-0582-9}.
+
+\bibitem[Cornut(2025)]{cornut2024imgui}
+Omar Cornut.
+\newblock Dear {ImGui}: Bloat-free graphical user interface for {C++} with
+  minimal dependencies.
+\newblock \url{https://github.com/ocornut/imgui}, 2025.
+
+\bibitem[Fedorov et~al.(2012)Fedorov, Beichel, Kalpathy-Cramer, Finet,
+  Fillion-Robin, Pujol, Bauer, Jennings, Fennessy, Sonka, Buatti, Aylward,
+  Miller, Pieper, and Kikinis]{fedorov2012slicer}
+Andriy Fedorov, Reinhard Beichel, Jayashree Kalpathy-Cramer, Julien Finet,
+  Jean-Christophe Fillion-Robin, Sonia Pujol, Christian Bauer, Dominique
+  Jennings, Fiona Fennessy, Milan Sonka, John Buatti, Stephen Aylward, James~V.
+  Miller, Steve Pieper, and Ron Kikinis.
+\newblock {3D Slicer} as an image computing platform for the {Quantitative
+  Imaging Network}.
+\newblock \emph{Magnetic Resonance Imaging}, 30\penalty0 (9):\penalty0
+  1323--1341, 2012.
+\newblock \doi{10.1016/j.mri.2012.05.001}.
+
+\bibitem[Girardeau-Montaut(2016)]{girardeau2016cloudcompare}
+Daniel Girardeau-Montaut.
+\newblock {CloudCompare} (version 2.x) [{GPL} software].
+\newblock \url{https://www.cloudcompare.org/}, 2016.
+
+\bibitem[Isensee et~al.(2025)Isensee, Rokuss, Kr{\"a}mer, Dinkelacker,
+  Ravindran, Stritzke, Hamm, Wald, Langenberg, Ulrich, Deissler, Floca, and
+  Maier-Hein]{isensee2025nninteractive}
+Fabian Isensee, Maximilian Rokuss, Lars Kr{\"a}mer, Stefan Dinkelacker, Ashis
+  Ravindran, Florian Stritzke, Benjamin Hamm, Tassilo Wald, Moritz Langenberg,
+  Constantin Ulrich, Jonathan Deissler, Ralf Floca, and Klaus Maier-Hein.
+\newblock {nnInteractive}: Redefining {3D} promptable segmentation, 2025.
+\newblock arXiv:2503.08373.
+
+\bibitem[L{\"o}ffler et~al.(2020)L{\"o}ffler, Sekuboyina, Jacob, Grau, Scharr,
+  El~Husseini, Kallweit, Zimmer, Baum, and Kirschke]{loffler2020verse}
+Maximilian~T. L{\"o}ffler, Anjany Sekuboyina, Alina Jacob, Anna-Lena Grau,
+  Andreas Scharr, Malek El~Husseini, Mareike Kallweit, Claus Zimmer, Thomas
+  Baum, and Jan~S. Kirschke.
+\newblock A vertebral segmentation dataset with fracture grading.
+\newblock \emph{Radiology: Artificial Intelligence}, 2\penalty0 (4):\penalty0
+  e190138, 2020.
+\newblock \doi{10.1148/ryai.2020190138}.
+
+\bibitem[Lorensen and Cline(1987)]{lorensen1987marching}
+William~E. Lorensen and Harvey~E. Cline.
+\newblock Marching cubes: A high resolution {3D} surface construction
+  algorithm.
+\newblock \emph{ACM SIGGRAPH Computer Graphics}, 21\penalty0 (4):\penalty0
+  163--169, 1987.
+\newblock \doi{10.1145/37402.37422}.
+
+\bibitem[{Pointcept Contributors}(2023)]{pointcept2023}
+{Pointcept Contributors}.
+\newblock Pointcept: A codebase for point cloud perception research.
+\newblock \url{https://github.com/Pointcept/Pointcept}, 2023.
+
+\bibitem[Sekuboyina et~al.(2021)Sekuboyina, Husseini, Bayat, L{\"o}ffler,
+  Liebl, Li, Tetteh, Kuka{\v{c}}ka, Payer, {\v{S}}tern, Urschler, Chen, Cheng,
+  Lessmann, Zhao, Jiang, Shen, Chen, Zhang, Xu, Rodrigues, Nasiri,
+  et~al.]{sekuboyina2021verse}
+Anjany Sekuboyina, Malek~E. Husseini, Amirhossein Bayat, Maximilian
+  L{\"o}ffler, Hans Liebl, Hongwei Li, Giles Tetteh, Jan Kuka{\v{c}}ka,
+  Christian Payer, Darko {\v{S}}tern, Martin Urschler, Maodong Chen, Dalong
+  Cheng, Nikolas Lessmann, Yujin Zhao, Yingjie Jiang, Zhengxiao Shen, Zhen
+  Chen, Shengfei Zhang, Wei Xu, Jo{\~a}o Rodrigues, Sina Nasiri, et~al.
+\newblock {VerSe}: A vertebrae labelling and segmentation benchmark for
+  multi-detector {CT} images.
+\newblock \emph{Medical Image Analysis}, 73:\penalty0 102166, 2021.
+\newblock \doi{10.1016/j.media.2021.102166}.
+
+\bibitem[Stokes(1994)]{stokes1994srs}
+Ian A.~F. Stokes.
+\newblock Three-dimensional terminology of spinal deformity: A report presented
+  to the {Scoliosis Research Society} by the {Scoliosis Research Society
+  Working Group} on 3-{D} terminology of spinal deformity.
+\newblock \emph{Spine}, 19\penalty0 (2):\penalty0 236--248, 1994.
+\newblock \doi{10.1097/00007632-199401001-00020}.
+
+\bibitem[Wu et~al.(2024)Wu, Jiang, Wang, Liu, Liu, Qiao, Ouyang, He, and
+  Zhao]{wu2024ptv3}
+Xiaoyang Wu, Li~Jiang, Peng-Shuai Wang, Zhijian Liu, Xihui Liu, Yu~Qiao, Wanli
+  Ouyang, Tong He, and Hengshuang Zhao.
+\newblock Point transformer {V3}: Simpler, faster, stronger.
+\newblock In \emph{Proceedings of the IEEE/CVF Conference on Computer Vision
+  and Pattern Recognition (CVPR)}, pages 4840--4851, 2024.
+\newblock \doi{10.1109/CVPR52733.2024.00463}.
+
+\bibitem[Wu et~al.(2025)Wu, DeTone, Frost, Shen, Xie, Yang, Engel, Newcombe,
+  Zhao, and Straub]{wu2025sonata}
+Xiaoyang Wu, Daniel DeTone, Duncan Frost, Tianwei Shen, Chris Xie, Nan Yang,
+  Jakob Engel, Richard Newcombe, Hengshuang Zhao, and Julian Straub.
+\newblock Sonata: Self-supervised learning of reliable point representations.
+\newblock In \emph{Proceedings of the IEEE/CVF Conference on Computer Vision
+  and Pattern Recognition (CVPR)}, 2025.
+\newblock arXiv:2503.16429.
+
+\bibitem[Yushkevich et~al.(2006)Yushkevich, Piven, Hazlett, Smith, Ho, Gee, and
+  Gerig]{yushkevich2006itksnap}
+Paul~A. Yushkevich, Joseph Piven, Heather~Cody Hazlett, Rachel~Gimpel Smith,
+  Sean Ho, James~C. Gee, and Guido Gerig.
+\newblock User-guided {3D} active contour segmentation of anatomical
+  structures: Significantly improved efficiency and reliability.
+\newblock \emph{NeuroImage}, 31\penalty0 (3):\penalty0 1116--1128, 2006.
+\newblock \doi{10.1016/j.neuroimage.2006.01.015}.
+
+\end{thebibliography}

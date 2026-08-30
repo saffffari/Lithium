@@ -1,0 +1,48 @@
+<svg xmlns='http://www.w3.org/2000/svg' width='1000' height='560' viewBox='0 0 1000 560'><defs><marker id='ah' markerWidth='8' markerHeight='8' refX='7' refY='4' orient='auto'><path d='M0,0 L8,4 L0,8 z' fill='#6b6b6b'/></marker></defs><rect width='1000' height='560' fill='white'/><text x='16' y='34' font-family='DejaVu Sans, Helvetica, Arial, sans-serif' font-size='19' fill='#1a1a1a' text-anchor='start' font-weight='bold'>The catalog is the dataset: one copy of each cloud, one label array per (cloud, project)</text>
+<rect x='16' y='60' width='270' height='470' rx='12' fill='#fbfbfb' stroke='#d9d9d9' stroke-width='1'/>
+<text x='30' y='90' font-family='DejaVu Sans, Helvetica, Arial, sans-serif' font-size='16' fill='#1a1a1a' text-anchor='start' font-weight='bold'>CATALOG</text>
+<text x='30' y='116.0' font-family='DejaVu Sans, Helvetica, Arial, sans-serif' font-size='13' fill='#6b6b6b' text-anchor='start' font-weight='normal'>721 clouds, content-hashed</text>
+<text x='30' y='133.55' font-family='DejaVu Sans, Helvetica, Arial, sans-serif' font-size='13' fill='#6b6b6b' text-anchor='start' font-weight='normal'>data/&lt;key&gt;.npz</text>
+<text x='30' y='151.1' font-family='DejaVu Sans, Helvetica, Arial, sans-serif' font-size='13' fill='#6b6b6b' text-anchor='start' font-weight='normal'>previews/, index.json</text>
+<rect x='32' y='200' width='238' height='66' rx='8' fill='white' stroke='#6b6b6b' stroke-width='1'/>
+<text x='46' y='228' font-family='DejaVu Sans, Helvetica, Arial, sans-serif' font-size='15' fill='#1a1a1a' text-anchor='start' font-weight='bold'>cloud A</text>
+<text x='46' y='252' font-family='DejaVu Sans, Helvetica, Arial, sans-serif' font-size='12' fill='#6b6b6b' text-anchor='start' font-weight='normal'>key = sha256(bytes)[:16]</text>
+<rect x='32' y='300' width='238' height='66' rx='8' fill='white' stroke='#6b6b6b' stroke-width='1'/>
+<text x='46' y='328' font-family='DejaVu Sans, Helvetica, Arial, sans-serif' font-size='15' fill='#1a1a1a' text-anchor='start' font-weight='bold'>cloud B</text>
+<text x='46' y='352' font-family='DejaVu Sans, Helvetica, Arial, sans-serif' font-size='12' fill='#6b6b6b' text-anchor='start' font-weight='normal'>key = sha256(bytes)[:16]</text>
+<rect x='32' y='400' width='238' height='66' rx='8' fill='white' stroke='#6b6b6b' stroke-width='1'/>
+<text x='46' y='428' font-family='DejaVu Sans, Helvetica, Arial, sans-serif' font-size='15' fill='#1a1a1a' text-anchor='start' font-weight='bold'>cloud C</text>
+<text x='46' y='452' font-family='DejaVu Sans, Helvetica, Arial, sans-serif' font-size='12' fill='#6b6b6b' text-anchor='start' font-weight='normal'>key = sha256(bytes)[:16]</text>
+<rect x='340' y='60' width='300' height='210' rx='12' fill='#fff1e3' stroke='#f28c28' stroke-width='1'/>
+<text x='354' y='90' font-family='DejaVu Sans, Helvetica, Arial, sans-serif' font-size='16' fill='#1a1a1a' text-anchor='start' font-weight='bold'>PROJECT  Gold247 · 6-class</text>
+<text x='354' y='118.0' font-family='DejaVu Sans, Helvetica, Arial, sans-serif' font-size='13' fill='#6b6b6b' text-anchor='start' font-weight='normal'>ontology: 6 classes, locked</text>
+<text x='354' y='135.55' font-family='DejaVu Sans, Helvetica, Arial, sans-serif' font-size='13' fill='#6b6b6b' text-anchor='start' font-weight='normal'>labels/proj_1/&lt;key&gt;.npy</text>
+<text x='354' y='153.1' font-family='DejaVu Sans, Helvetica, Arial, sans-serif' font-size='13' fill='#6b6b6b' text-anchor='start' font-weight='normal'>models/proj_1.json</text>
+<text x='354' y='170.65' font-family='DejaVu Sans, Helvetica, Arial, sans-serif' font-size='13' fill='#6b6b6b' text-anchor='start' font-weight='normal'>settings: active model</text>
+<rect x='340' y='320' width='300' height='210' rx='12' fill='#f3f6fb' stroke='#0073b2' stroke-width='1'/>
+<text x='354' y='350' font-family='DejaVu Sans, Helvetica, Arial, sans-serif' font-size='16' fill='#1a1a1a' text-anchor='start' font-weight='bold'>PROJECT  Endplate · 2-class</text>
+<text x='354' y='378.0' font-family='DejaVu Sans, Helvetica, Arial, sans-serif' font-size='13' fill='#6b6b6b' text-anchor='start' font-weight='normal'>ontology: 2 classes</text>
+<text x='354' y='395.55' font-family='DejaVu Sans, Helvetica, Arial, sans-serif' font-size='13' fill='#6b6b6b' text-anchor='start' font-weight='normal'>labels/proj_2/&lt;key&gt;.npy</text>
+<text x='354' y='413.1' font-family='DejaVu Sans, Helvetica, Arial, sans-serif' font-size='13' fill='#6b6b6b' text-anchor='start' font-weight='normal'>same clouds,</text>
+<text x='354' y='430.65' font-family='DejaVu Sans, Helvetica, Arial, sans-serif' font-size='13' fill='#6b6b6b' text-anchor='start' font-weight='normal'>independent labels</text>
+<line x1='270' y1='233' x2='336' y2='190' stroke='#f28c28' stroke-width='1.6' marker-end='url(#ah)'/>
+<line x1='270' y1='333' x2='336' y2='190' stroke='#f28c28' stroke-width='1.6' marker-end='url(#ah)'/>
+<line x1='270' y1='233' x2='336' y2='430' stroke='#0073b2' stroke-width='1.6' marker-end='url(#ah)'/>
+<line x1='270' y1='433' x2='336' y2='445' stroke='#0073b2' stroke-width='1.6' marker-end='url(#ah)'/>
+<rect x='692' y='60' width='292' height='210' rx='12' fill='#fff8ef' stroke='#f28c28' stroke-width='1' stroke-dasharray='6,5'/>
+<text x='706' y='90' font-family='DejaVu Sans, Helvetica, Arial, sans-serif' font-size='16' fill='#1a1a1a' text-anchor='start' font-weight='bold'>SANDBOX  (always present)</text>
+<text x='706' y='118.0' font-family='DejaVu Sans, Helvetica, Arial, sans-serif' font-size='13' fill='#6b6b6b' text-anchor='start' font-weight='normal'>no ontology, no own labels</text>
+<text x='706' y='135.55' font-family='DejaVu Sans, Helvetica, Arial, sans-serif' font-size='13' fill='#6b6b6b' text-anchor='start' font-weight='normal'>any model on any cloud</text>
+<text x='706' y='153.1' font-family='DejaVu Sans, Helvetica, Arial, sans-serif' font-size='13' fill='#6b6b6b' text-anchor='start' font-weight='normal'>output = cloud-level layer</text>
+<text x='706' y='170.65' font-family='DejaVu Sans, Helvetica, Arial, sans-serif' font-size='13' fill='#6b6b6b' text-anchor='start' font-weight='normal'>labels/layer:&lt;model&gt;/&lt;key&gt;.npy</text>
+<text x='706' y='188.2' font-family='DejaVu Sans, Helvetica, Arial, sans-serif' font-size='13' fill='#6b6b6b' text-anchor='start' font-weight='normal'>+ _layer.json</text>
+<line x1='270' y1='433' x2='688' y2='200' stroke='#f28c28' stroke-width='1.6' marker-end='url(#ah)'/>
+<rect x='692' y='320' width='292' height='210' rx='12' fill='#f6f6f6' stroke='#6b6b6b' stroke-width='1'/>
+<text x='706' y='350' font-family='DejaVu Sans, Helvetica, Arial, sans-serif' font-size='16' fill='#1a1a1a' text-anchor='start' font-weight='bold'>MODELS  (26 registered)</text>
+<text x='706' y='378.0' font-family='DejaVu Sans, Helvetica, Arial, sans-serif' font-size='13' fill='#6b6b6b' text-anchor='start' font-weight='normal'>checkpoint + frozen class map</text>
+<text x='706' y='395.55' font-family='DejaVu Sans, Helvetica, Arial, sans-serif' font-size='13' fill='#6b6b6b' text-anchor='start' font-weight='normal'>runnable in any project whose</text>
+<text x='706' y='413.1' font-family='DejaVu Sans, Helvetica, Arial, sans-serif' font-size='13' fill='#6b6b6b' text-anchor='start' font-weight='normal'>ontology has its classes (by name)</text>
+<text x='706' y='430.65' font-family='DejaVu Sans, Helvetica, Arial, sans-serif' font-size='13' fill='#6b6b6b' text-anchor='start' font-weight='normal'>best mIoU is the default</text>
+<line x1='640' y1='200' x2='688' y2='400' stroke='#6b6b6b' stroke-width='1.6' marker-end='url(#ah)'/>
+<line x1='838' y1='316' x2='838' y2='276' stroke='#6b6b6b' stroke-width='1.6' marker-end='url(#ah)'/>
+<text x='16' y='548' font-family='DejaVu Sans, Helvetica, Arial, sans-serif' font-size='13' fill='#6b6b6b' text-anchor='start' font-weight='normal'>Every stroke is written atomically under the active namespace — no “save project” step, nothing lost by closing the app.</text></svg>

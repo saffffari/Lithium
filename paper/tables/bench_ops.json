@@ -1,0 +1,59 @@
+{
+ "n_points": 1000000,
+ "resolution": [
+  1920,
+  1080
+ ],
+ "repeats": 7,
+ "stat": "median",
+ "cpu": "x86_64",
+ "python": "3.12.13",
+ "numpy": "2.5.1",
+ "ops": {
+  "pick": {
+   "label": "pick (nearest point)",
+   "ms": 27.249838021816686,
+   "min_ms": 26.16220200434327,
+   "points": 1000000
+  },
+  "box": {
+   "label": "box select",
+   "ms": 29.188436979893595,
+   "min_ms": 28.289578011026606,
+   "points": 1000000,
+   "selected": 801300
+  },
+  "lasso": {
+   "label": "lasso select",
+   "ms": 36.48861200781539,
+   "min_ms": 34.973403002368286,
+   "points": 1000000,
+   "selected": 634742
+  },
+  "brush": {
+   "label": "brush select (r=1)",
+   "ms": 9.246622998034582,
+   "min_ms": 6.2999109795782715,
+   "points": 1000000,
+   "selected": 4262
+  },
+  "apply": {
+   "label": "apply label (500k pts)",
+   "ms": 1.372466009343043,
+   "min_ms": 1.3425840006675571,
+   "points": 500000
+  },
+  "undo": {
+   "label": "undo (500k pts)",
+   "ms": 0.5982790025882423,
+   "min_ms": 0.5924640281591564,
+   "points": 500000
+  },
+  "redo": {
+   "label": "redo (500k pts)",
+   "ms": 0.5934969813097268,
+   "min_ms": 0.5860670062247664,
+   "points": 500000
+  }
+ }
+}

@@ -2408,6 +2408,9 @@ class App:
             else:
                 print(f"Path not found: {path}")
 
+        # --project / --cloud / --tab startup flags (see _parse_startup_flags)
+        self._apply_startup_opts()
+
         if not self.entries:
             # No CLI path — start with a blank canvas. The user picks
             # a collection / folder from the sidebar to load clouds.
@@ -5087,6 +5090,37 @@ class App:
         if self.catalog is not None:
             self.catalog.update_project_ontology(proj.id, registry.to_json())
 
+    def _apply_startup_opts(self) -> None:
+        """Open the requested project / cloud / tab at startup."""
+        opts = STARTUP_OPTS
+        if not opts or not any(opts.values()):
+            return
+        proj = opts.get("project")
+        if proj and self.catalog is not None:
+            pid = None
+            for k, p in self.catalog.projects.items():
+                if k == proj or p.name == proj:
+                    pid = k
+                    break
+            if pid is None and proj.lower() == "sandbox":
+                from src.data.library_catalog import SANDBOX_PROJECT_ID
+                pid = SANDBOX_PROJECT_ID
+            if pid is None:
+                print(f"--project: no project named {proj!r}")
+            else:
+                self.set_active_view(("project", pid))
+                self._sync_project_state(("project", pid))
+        idx = opts.get("cloud")
+        if idx is not None and 0 <= idx < len(self.entries):
+            self._on_cloud_selected(idx, enter_light_table=(opts.get("tab") in (None, "light")))
+        tab = opts.get("tab")
+        if tab == "sheets":
+            self.mode = MODE_CONTACT_SHEETS
+        elif tab == "light" and self.entries:
+            self.mode = MODE_LIGHT_TABLE
+        elif tab == "train":
+            self.mode = MODE_AUTOMATION
+
     def set_sandbox_layer(self, model_id: str | None) -> None:
         """SANDBOX: show a different cloud-level layer (one model's
         predictions). Rebinds the label namespace + registry, re-reads
@@ -7275,6 +7309,23 @@ class App:
             self.import_path(p)
 
 
+STARTUP_OPTS: dict = {}
+
+
+def _parse_startup_flags(argv: list[str]) -> list[str]:
+    """Strip ``--project/--cloud/--tab`` from argv (used to open Lithium
+    straight into a project, a cloud, or a tab — for scripting, screenshots
+    and launchers). Returns the remaining argv (positional path etc.)."""
+    import argparse
+    ap = argparse.ArgumentParser(add_help=False)
+    ap.add_argument("--project", default=None, help="open this project (name or id) on start")
+    ap.add_argument("--cloud", type=int, default=None, help="select the N-th cloud of that view (0-based)")
+    ap.add_argument("--tab", choices=("sheets", "light", "train"), default=None, help="start on this tab")
+    opts, rest = ap.parse_known_args(argv[1:])
+    STARTUP_OPTS.update(project=opts.project, cloud=opts.cloud, tab=opts.tab)
+    return [argv[0]] + rest
+
+
 def main():
     # Dispatch to CLI if a subcommand is given
     if len(sys.argv) > 1 and sys.argv[1] in ('render', 'spin'):
@@ -7282,6 +7333,7 @@ def main():
         cli_main(sys.argv[1:])
         return
 
+    sys.argv = _parse_startup_flags(sys.argv)
     app = App()
     app.run()
 
