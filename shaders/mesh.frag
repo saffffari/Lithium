@@ -1,4 +1,4 @@
-#version 430 core
+#version 410 core
 
 // Directional Lambert shading using the interpolated per-vertex normal.
 // Camera-locked light keeps the lighting consistent regardless of how

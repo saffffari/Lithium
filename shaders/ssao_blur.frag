@@ -1,4 +1,4 @@
-#version 430 core
+#version 410 core
 
 // Bilateral blur for the raw SSAO buffer.
 //

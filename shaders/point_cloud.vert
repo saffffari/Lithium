@@ -1,4 +1,4 @@
-#version 430 core
+#version 410 core
 
 uniform mat4 u_model;
 uniform mat4 u_view;

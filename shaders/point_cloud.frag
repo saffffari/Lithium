@@ -1,4 +1,4 @@
-#version 430 core
+#version 410 core
 
 uniform float u_brightness;       // -1.0 to 1.0, default 0.0
 uniform float u_contrast;         // 0.0 to 3.0, default 1.0

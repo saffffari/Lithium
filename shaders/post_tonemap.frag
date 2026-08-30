@@ -1,4 +1,4 @@
-#version 430 core
+#version 410 core
 
 // Final display pass: HDR -> AO multiply -> ACES -> gamma 2.2.
 //

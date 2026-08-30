@@ -1,4 +1,4 @@
-#version 430 core
+#version 410 core
 
 // Vertex shader for the surface mesh. Passes the view-space normal to
 // the fragment shader for Lambert-style directional shading.

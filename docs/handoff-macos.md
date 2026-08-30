@@ -1,7 +1,10 @@
-# macOS handoff — status and scope
+# macOS handoff — status and scope (updated 2026-08-30: the GL wall is gone)
 
 For the agent (or human) working in this repo cloned on the Mac.
-Short version: **do not attempt to make the current renderer run.**
+Short version: **it runs.** The renderer needed nothing beyond OpenGL 4.1 — the
+`#version 430` lines and the 4.3 context hint were the only blockers, and every
+shader now compiles under a strict 4.1 core context (verified with Mesa's
+`MESA_GL_VERSION_OVERRIDE=4.1FC`). See `docs/macos.md` for the recipe.
 
 ## Why there is no macOS build yet
 

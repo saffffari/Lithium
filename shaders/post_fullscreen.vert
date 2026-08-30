@@ -1,4 +1,4 @@
-#version 430 core
+#version 410 core
 
 // Fullscreen-triangle vertex shader, shared by every postprocess pass.
 // The input is a single triangle in clip space that covers the viewport

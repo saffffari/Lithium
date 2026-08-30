@@ -1,4 +1,4 @@
-#version 430 core
+#version 410 core
 
 // Gallery cache blit. Passthrough sample of the cached gallery RT into
 // scene_rt. Used once per frame to draw the whole Contact Sheets area

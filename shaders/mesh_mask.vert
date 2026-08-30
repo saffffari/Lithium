@@ -1,4 +1,4 @@
-#version 430 core
+#version 410 core
 
 // Minimal vertex shader for the selection-mask pass.
 //

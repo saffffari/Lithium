@@ -50,10 +50,9 @@ portfolio. Free.*
 ## Install
 
 **Installers** (recommended): grab the latest release for your platform from
-[Releases](../../releases) — Windows installer, Linux binary. macOS arrives
-with the Metal renderer milestone.
+[Releases](../../releases) — Windows installer, Linux binary, macOS app (unsigned).
 
-**From source** (Linux / Windows, Python 3.12):
+**From source** (Linux / Windows / macOS, Python 3.12):
 
 ```bash
 git clone <repo-url> lithium
@@ -93,9 +92,9 @@ rates on a single GPU; see [docs/perf-1.1.md](docs/perf-1.1.md).
 
 - **Linux** — primary development platform.
 - **Windows** — supported; the app was originally Windows-native.
-- **macOS** — not yet: the current renderer requires OpenGL 4.3, which macOS
-  never shipped. The in-progress WebGPU renderer runs on Metal and is the
-  macOS path.
+- **macOS** — runs from source on OpenGL 4.1 (Apple Silicon and Intel); see
+  [docs/macos.md](docs/macos.md). View/annotate only — training and INFER need
+  CUDA. An unsigned `.app` is built by CI for each release.
 - Unsigned binaries: Windows SmartScreen and browser warnings are expected
   for now — the code is right here to audit.
 
