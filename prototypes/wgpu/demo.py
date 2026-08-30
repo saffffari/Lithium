@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """wgpu (WebGPU→Vulkan) massive point cloud demo — EDL renderer spike.
 
-The render2 proof-of-concept for 3Photon 1.1's clean-slate renderer:
+The render2 proof-of-concept for Lithium 1.1's clean-slate renderer:
 
   pass 1  point-list → MRT: rgba8 color + r32float linear eye depth
           (+ depth24plus for z-test), one draw per ≤12M-pt chunk
@@ -211,7 +211,7 @@ def main():
 
     canvas = RenderCanvas(
         size=(1920, 1080),
-        title=f"3Photon render2 spike — {n_total/1e6:.0f}M pts")
+        title=f"Lithium render2 spike — {n_total/1e6:.0f}M pts")
     adapter = wgpu.gpu.request_adapter_sync(power_preference="high-performance")
     print("adapter:", adapter.info["device"], "|", adapter.info["backend_type"])
     device = adapter.request_device_sync(required_limits=adapter.limits)
@@ -453,7 +453,7 @@ def main():
             state["frames"] = 0
             state["t_fps"] = now
             canvas.set_title(
-                f"3Photon render2 spike — {n_total/1e6:.0f}M pts — "
+                f"Lithium render2 spike — {n_total/1e6:.0f}M pts — "
                 f"{state['fps']:.0f} fps — EDL {state['edl'][0]:.1f}")
             print(f"fps {state['fps']:6.1f}   edl {state['edl'][0]:.2f}")
         canvas.request_draw(frame)

@@ -1,4 +1,4 @@
-# 3Photon Architecture
+# Lithium Architecture
 
 This file is a brief overview. The **canonical, citation-backed architecture map** lives in `_audit/`, regenerated on demand by the `cartographer` subagent:
 
@@ -13,7 +13,7 @@ Refresh by invoking `cartographer` (see `.claude/agents/cartographer.md`).
 
 ## High-level shape
 
-3Photon is a single-process Python desktop app: GLFW window, ModernGL OpenGL 4.3 context, Dear ImGui overlay, custom GLSL shaders. The entire visible application is one `App` class in `src/main.py` owning a 3-mode view machine. Each mode is a different render path with shared camera, catalog, label registry, and undo stack. Heavy work runs as background threads (preview build, mesh Poisson, training, inference); the main thread polls futures each frame and never blocks.
+Lithium is a single-process Python desktop app: GLFW window, ModernGL OpenGL 4.3 context, Dear ImGui overlay, custom GLSL shaders. The entire visible application is one `App` class in `src/main.py` owning a 3-mode view machine. Each mode is a different render path with shared camera, catalog, label registry, and undo stack. Heavy work runs as background threads (preview build, mesh Poisson, training, inference); the main thread polls futures each frame and never blocks.
 
 The three modes are **CONTACT_SHEETS** (gallery of clouds), **LIGHT_TABLE** (single-cloud inspection + labeling + measurement), and **AUTOMATION** (embedded CLI for batch operations + PT-v3 training).
 
@@ -41,7 +41,7 @@ The one acknowledged exception: `gui/` and `main.py` form a tight bidirectional 
 
 The decisions that have proven durable are documented in [_audit/ORIENTATION.md](../_audit/ORIENTATION.md) ("What's surprising or non-obvious"). Highlights:
 
-- **The catalog *is* the dataset.** Once a cloud is imported, its labels live under `~/.3photon/library/labels/<namespace>/<file_key>.npy` forever (namespace = project id, or `_library` outside projects — see [design-1.1.md](design-1.1.md)). There is no separate "save project" step.
+- **The catalog *is* the dataset.** Once a cloud is imported, its labels live under `~/.lithium/library/labels/<namespace>/<file_key>.npy` forever (namespace = project id, or `_library` outside projects — see [design-1.1.md](design-1.1.md)). There is no separate "save project" step.
 - **Anchors are cloud-local.** `(cloud_key, local_pos)` — never world coords. Measurements survive model-matrix changes because the resolver applies the current model matrix at eval time.
 - **GPU per-stroke label upload is 4 MB, not 32 MB**, via the 4-VBO split in `src/rendering/point_cloud_renderer.py`.
 - **GPU uploads happen once.** Cloud geometry is uploaded to VBOs at load time; only uniforms change per frame.
@@ -53,7 +53,7 @@ Background threads load files, build previews/meshes, and run the PT-v3 training
 
 ## Subprocess venvs
 
-- conda env `3photon-ptv3` — Pointcept PT-v3 training
+- conda env `lithium-ptv3` — Pointcept PT-v3 training
 
 See [docs/training_setup.md](training_setup.md) for the PT-v3 env recipe.
 

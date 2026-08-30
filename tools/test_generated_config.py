@@ -1,6 +1,6 @@
 """End-to-end config generation + Pointcept parse test.
 
-1. Build a fake 3Photon export with classes.json + a scene.
+1. Build a fake Lithium export with classes.json + a scene.
 2. Run our config_gen on it.
 3. Ask Pointcept to parse that config.
 4. Try building the MODEL from the parsed config (no training).
@@ -14,8 +14,8 @@ import tempfile
 import shutil
 import traceback
 
-# Need 3Photon on sys.path so we can import our generator
-sys.path.insert(0, r"D:\3Photon")
+# Need Lithium on sys.path so we can import our generator
+sys.path.insert(0, r"D:\Lithium")
 
 import numpy as np
 
@@ -25,8 +25,8 @@ from src.export.dataset_export import export_dataset
 from src.training.config_gen import PTv3TrainParams, generate_ptv3_config
 
 
-POINTCEPT_DIR = r"D:\3Photon\training\pointcept"
-EXT_DIR = r"D:\3Photon\src\training\pointcept_ext"
+POINTCEPT_DIR = r"D:\Lithium\training\pointcept"
+EXT_DIR = r"D:\Lithium\src\training\pointcept_ext"
 
 
 def make_tiny_export(root: str):
@@ -55,7 +55,7 @@ def make_tiny_export(root: str):
 
 
 def main():
-    tmp = tempfile.mkdtemp(prefix="3photon_cfg_test_")
+    tmp = tempfile.mkdtemp(prefix="lithium_cfg_test_")
     try:
         export_dir = os.path.join(tmp, "dataset")
         os.makedirs(export_dir)

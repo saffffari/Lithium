@@ -214,7 +214,7 @@ def test_config_gen_generates_valid_python():
         assert "DefaultSegmentorV2" in source
         assert "PT-v3m1" in source
         assert 'ignore_index=255' in source
-        assert "ThreePhotonDataset" in source
+        assert "LithiumDataset" in source
         # num_classes was injected from classes.json (3 real + Unlabeled@0)
         assert "num_classes=4" in source
         # Dataset path is forward-slashed for cross-platform friendliness

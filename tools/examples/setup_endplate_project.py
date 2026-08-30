@@ -58,7 +58,7 @@ _LABEL_COLORS = {
 # label, those predictions silently fall to Unlabeled in the new
 # project, which is exactly what an endplates-only workflow needs.
 _DEFAULT_MODEL_WORK_DIR = Path(
-    r"D:/3Photon/dataset/training_runs/tuned_4class_1778457554")
+    r"~/Lithium/dataset/training_runs/tuned_4class_1778457554")
 _DEFAULT_MODEL_NAME = "tuned_4class"
 _DEFAULT_MODEL_CLASSES = [
     "Unlabeled", "Superior_Endplate", "Inferior_Endplate", "Spinous Process",
@@ -82,7 +82,7 @@ def _ensure_default_model_classes_json() -> bool:
     The resolver in ``panels._find_classes_json_for_checkpoint`` walks up
     from the checkpoint dir and stops at the first ``classes.json`` it
     finds. Without this sidecar, the walk would reach
-    ``D:/3Photon/dataset/classes.json`` (5-class) and the lengths would
+    ``~/Lithium/dataset/classes.json`` (5-class) and the lengths would
     disagree with the model's seg_head (shape 4). Idempotent — overwrites
     if the file already exists, since the canonical content for this
     checkpoint never changes.

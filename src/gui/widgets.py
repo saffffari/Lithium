@@ -1,4 +1,4 @@
-"""Custom-drawn OP-1 style widgets for 3Photon — font-metric based layout."""
+"""Custom-drawn OP-1 style widgets for Lithium — font-metric based layout."""
 
 import math
 import time

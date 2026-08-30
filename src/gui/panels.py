@@ -1,4 +1,4 @@
-"""ImGui panels for 3Photon — tabbed sidebar with Contact Sheets, Light Table, Automation."""
+"""ImGui panels for Lithium — tabbed sidebar with Contact Sheets, Light Table, Automation."""
 
 import math
 import time
@@ -3515,14 +3515,14 @@ def _launch_inference(app, data_dir: str, parent_model=None):
 
     # Build the inference command using our infer script. The S3DIS-
     # flavoured script is hardcoded for 13 furniture classes + ScanNet
-    # pdnorm conditions; calling it on a 3Photon checkpoint blows up in
+    # pdnorm conditions; calling it on a Lithium checkpoint blows up in
     # load_state_dict (strict=True) the moment the seg_head shapes
-    # disagree. infer_3photon.py reads num_classes from the dataset's
+    # disagree. infer_lithium.py reads num_classes from the dataset's
     # classes.json and uses pdnorm_conditions=("Vertebrae",), matching
     # what config_gen.py emits for training.
     infer_script = os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        "tools", "infer_3photon.py",
+        "tools", "infer_lithium.py",
     )
 
     # If the dedicated script doesn't exist, use a generic approach
@@ -4109,7 +4109,7 @@ def _resolve_inference_checkpoint(app) -> str | None:
 def _find_classes_json_for_checkpoint(checkpoint_path: str) -> str | None:
     """Walk up from a checkpoint path looking for a ``classes.json`` sibling.
 
-    Standard 3Photon layout puts the file 4 levels above the checkpoint
+    Standard Lithium layout puts the file 4 levels above the checkpoint
     (``<data_root>/classes.json`` vs. ``<data_root>/training_runs/<run>/
     model/model_best.pth``). We search a few extra levels so off-standard
     layouts (e.g. a manually-moved checkpoint) still resolve.
@@ -4284,7 +4284,7 @@ def _predict_cloud(
     # cleaned up even if the subprocess raises, the user kills the
     # batch, or this function returns early. Without this, every
     # inference click leaks a directory under %TEMP%.
-    tmp_dir = tempfile.mkdtemp(prefix="3photon_infer_")
+    tmp_dir = tempfile.mkdtemp(prefix="lithium_infer_")
     try:
         in_path = os.path.join(tmp_dir, "input.npz")
         out_path = os.path.join(tmp_dir, "pred.npy")
@@ -4541,7 +4541,7 @@ class _BatchInferenceRunner:
         self.completed = 0
         self.failed = 0
         self._thread = threading.Thread(target=self._run, daemon=True,
-                                         name="3photon-batch-infer")
+                                         name="lithium-batch-infer")
 
     def start(self):
         self.running = True

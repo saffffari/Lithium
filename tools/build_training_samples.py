@@ -5,7 +5,7 @@ Reads the canonical VerSe per-vertebra PLYs exported under
 ``E:\\data\\verse\\exports\\{train,val,test}\\``, picks three disjoint
 groups of ~100 vertebrae, and copies them into
 ``E:\\data\\verse\\spinelab_training_samples\\group_{1,2,3}\\`` for
-import into 3Photon as fresh training batches.
+import into Lithium as fresh training batches.
 
 Selection strategy:
 

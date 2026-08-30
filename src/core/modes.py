@@ -1,4 +1,4 @@
-"""View-mode constants for the 3Photon top-level UI.
+"""View-mode constants for the Lithium top-level UI.
 
 Three modes; ordering follows the research workflow
 browse → label → train.  Lives in ``src.core`` so panels,

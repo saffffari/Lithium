@@ -511,7 +511,7 @@ def export_dataset(clouds: list, registry: LabelRegistry,
     os.makedirs(output_dir, exist_ok=True)
     # Wipe stale scenes from any previous export. Without this, a smaller
     # new export rides along with leftover scene_NNN dirs from a larger
-    # previous run — the ThreePhotonDataset loader globs scene_* and
+    # previous run — the LithiumDataset loader globs scene_* and
     # picks up everything, including incomplete leftovers that crash the
     # transform pipeline (KeyError: 'normal' on scenes that didn't get
     # fully written). Only the per-split dirs are removed; classes.json,

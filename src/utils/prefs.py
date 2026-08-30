@@ -1,6 +1,6 @@
-"""Cross-session UI preferences for 3Photon.
+"""Cross-session UI preferences for Lithium.
 
-Persists small key/value UI state to ``~/.3photon/prefs.json``. This is
+Persists small key/value UI state to ``~/.lithium/prefs.json``. This is
 distinct from ``schema.json`` (label taxonomy) and ``library/`` (cloud
 catalog) — it's purely for UI tweaks that should remember themselves
 across launches but don't belong in any of the bigger persistence
@@ -22,7 +22,7 @@ import os
 from pathlib import Path
 
 
-PREFS_DIR = Path.home() / ".3photon"
+PREFS_DIR = Path.home() / ".lithium"
 PREFS_PATH = PREFS_DIR / "prefs.json"
 
 

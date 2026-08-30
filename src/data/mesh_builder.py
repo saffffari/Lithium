@@ -89,7 +89,7 @@ def build_mesh(
     if not _have_open3d():
         raise MeshBuildUnavailable(
             "Mesh build requires open3d. Install with `pip install open3d` "
-            "into the same venv that runs 3Photon."
+            "into the same venv that runs Lithium."
         )
     import open3d as o3d
 

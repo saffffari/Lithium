@@ -1,4 +1,4 @@
-"""3Photon — Point Cloud Visualizer and Renderer.
+"""Lithium — Point Cloud Visualizer and Renderer.
 
 Entry point: GLFW window, ModernGL context, ImGui overlay, main render loop.
 Supports gallery view (all clouds) and individual view (single cloud, full resolution).
@@ -539,7 +539,7 @@ class App:
 
         # Contact Sheets fixed-cell scrollable grid state.
         # gallery_cell_size is the user-controlled icon size in pixels
-        # (Ctrl+wheel to resize). Loaded from ~/.3photon/prefs.json on
+        # (Ctrl+wheel to resize). Loaded from ~/.lithium/prefs.json on
         # startup so the user's preferred size sticks across sessions.
         # _gallery_scroll_y is the vertical scroll offset in pixels;
         # clamped to [0, content_h - area_h] every frame.
@@ -669,7 +669,7 @@ class App:
             try:
                 import ctypes
                 ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
-                    '3Photon.PointCloud.Viewer'
+                    'Lithium.PointCloud.Viewer'
                 )
             except Exception:
                 pass
@@ -2367,16 +2367,16 @@ class App:
         # imported — even before they drop anything new into the app.
         self._ensure_catalog()
 
-        # Single-instance lock. If another live 3Photon owns the catalog
+        # Single-instance lock. If another live Lithium owns the catalog
         # we refuse to launch — two writers would race on label files
         # and silently corrupt each other. Stale locks (PID is dead)
         # are cleared automatically.
         ok, blocking_pid = acquire_lock()
         if not ok:
             print(
-                f"Refusing to start: another 3Photon instance is using the "
+                f"Refusing to start: another Lithium instance is using the "
                 f"library catalog (pid {blocking_pid}). Close it first, or "
-                f"manually delete ~/.3photon/library/.lock if it's stale."
+                f"manually delete ~/.lithium/library/.lock if it's stale."
             )
             return
 
@@ -2984,7 +2984,7 @@ class App:
                   angle=0.0, profile='front')
 
         # Prompt centered below the alien.
-        prompt = "drop a point cloud or point 3photon at a directory"
+        prompt = "drop a point cloud or point lithium at a directory"
         prompt_w = imgui.calc_text_size(prompt)[0]
         prompt_y = cy + alien_h * 0.5 + s(14)
         dl.add_text(cx - prompt_w * 0.5, prompt_y,
@@ -4549,7 +4549,7 @@ class App:
             pass
 
         # Stop the training subprocess first — we own that handle and GLFW
-        # teardown doesn't cascade to it. Without this, closing 3Photon
+        # teardown doesn't cascade to it. Without this, closing Lithium
         # mid-training orphans the subprocess and it keeps running in the
         # background holding file locks and GPU memory.
         if getattr(self, 'training_runner', None) is not None:
@@ -5256,7 +5256,7 @@ class App:
 
     def _after_label_mutation(self, gpu, cloud) -> None:
         """Shared post-write bookkeeping: GPU upload, caches, sequence flag,
-        and persistent catalog labels (so closing and reopening 3Photon
+        and persistent catalog labels (so closing and reopening Lithium
         keeps the user's annotation state automatically).
 
         Catalog persistence is suppressed while a brush stroke is in

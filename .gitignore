@@ -26,8 +26,8 @@ venv/
 /verse_labels/
 
 # Research proposal artifacts (kept local; sources of truth live elsewhere).
-/3Photon_Research_Proposal.docx
-/3Photon_Research_Proposal.pdf
+/Lithium_Research_Proposal.docx
+/Lithium_Research_Proposal.pdf
 /proposal.js
 /proposal_pdf.py
 

@@ -1,7 +1,7 @@
 """DataLoader worker init shim for Windows spawn-mode workers.
 
 Windows ``torch.utils.data.DataLoader`` spawns each worker as a fresh
-Python interpreter. The main process registers ``ThreePhotonDataset``
+Python interpreter. The main process registers ``LithiumDataset``
 via the ``-c`` bootstrap before tools/train.py runs, but workers don't
 inherit any of that — they pickle/unpickle the dataset class and then
 try to look it up in their own (empty) DATASETS registry.
@@ -21,12 +21,12 @@ from __future__ import annotations
 
 def photon_worker_init_fn(worker_id: int, num_workers: int,
                           rank: int, seed) -> None:
-    """Re-import the ThreePhotonDataset class then run Pointcept's seed init."""
+    """Re-import the LithiumDataset class then run Pointcept's seed init."""
     # Importing this module already implies pointcept_ext is on
     # ``sys.path`` (otherwise the worker couldn't have unpickled this
     # function in the first place). So the import below is a plain
     # named import — no path mutation needed.
-    import three_photon_dataset  # noqa: F401 — registers ThreePhotonDataset
+    import lithium_dataset  # noqa: F401 — registers LithiumDataset
     from pointcept.utils.env import set_seed
     worker_seed = None if seed is None else num_workers * rank + worker_id + seed
     set_seed(worker_seed)

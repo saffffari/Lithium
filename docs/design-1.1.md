@@ -1,4 +1,4 @@
-# 3Photon 1.1 — Design
+# Lithium 1.1 — Design
 
 Rebuild of 1.0 (imported at commit `da3d6e4`) with the accumulated cruft cut,
 the audit bug backlog fixed, and the project/label/model data model reworked.
@@ -16,7 +16,7 @@ from the first project.
 **1.1 model:** the project is the label namespace.
 
 ```
-~/.3photon/library/
+~/.lithium/library/
   labels/<project_id>/<file_key>.npy          # per-project full-res labels
   preview_labels/<project_id>/<file_key>.npy  # per-project preview labels
 ```

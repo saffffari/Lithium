@@ -1,13 +1,13 @@
 """Export → hand off to a remote GPU box for training.
 
-Mode B from the design: when training doesn't run inside 3Photon
+Mode B from the design: when training doesn't run inside Lithium
 (shared cluster, borrowed workstation, cloud instance), the user
 still wants a one-shot "scp this directory and run" package. This
 module drops ``train.sh`` + ``train.bat`` + ``README.md`` next to
 an exported dataset so that starting training on any Pointcept-
 equipped machine is a two-command affair.
 
-Zero 3Photon involvement during the training run itself — the
+Zero Lithium involvement during the training run itself — the
 scripts invoke the user's own Pointcept install and leave
 checkpoints and predictions on disk where ``import_predictions``
 can find them when the user comes back.
@@ -19,10 +19,10 @@ import os
 import json
 
 
-_README_TEMPLATE = """# 3Photon → PTv3 handoff
+_README_TEMPLATE = """# Lithium → PTv3 handoff
 
 This directory is a PTv3/Pointcept-compatible dataset exported from
-3Photon, plus a self-contained launcher for training.
+Lithium, plus a self-contained launcher for training.
 
 ## Layout
 
@@ -38,7 +38,7 @@ This directory is a PTv3/Pointcept-compatible dataset exported from
 │       └── segment.npy
 ├── val/
 ├── test/
-├── three_photon_dataset.py   # custom Pointcept DATASETS entry
+├── lithium_dataset.py   # custom Pointcept DATASETS entry
 ├── ptv3_config.py      # generated Pointcept config
 ├── train.sh            # Linux / WSL / macOS launcher
 ├── train.bat           # Windows launcher
@@ -65,7 +65,7 @@ train.bat C:\\path\\to\\python.exe C:\\path\\to\\pointcept
 
 Both scripts:
 
-1. Copy ``three_photon_dataset.py`` onto ``PYTHONPATH`` so Pointcept's
+1. Copy ``lithium_dataset.py`` onto ``PYTHONPATH`` so Pointcept's
    registry picks up our custom dataset.
 2. Invoke ``tools/train.py`` with ``ptv3_config.py``.
 3. Write checkpoints and logs into ``runs/{num_classes}class-{timestamp}/``.
@@ -74,7 +74,7 @@ Both scripts:
 
 Copy the best checkpoint (``runs/.../model_best.pth``) and, after
 inference, the per-point prediction ``predictions.npy`` back to your
-3Photon project. In 3Photon, use **Import predictions** pointing at
+Lithium project. In Lithium, use **Import predictions** pointing at
 the ``.npy`` and this directory's ``classes.json`` — the registry
 will pick up matching class names and colors automatically.
 
@@ -86,7 +86,7 @@ will pick up matching class names and colors automatically.
 
 _TRAIN_SH_TEMPLATE = """#!/usr/bin/env bash
 #
-# 3Photon → PTv3 training launcher (Linux / WSL / macOS).
+# Lithium → PTv3 training launcher (Linux / WSL / macOS).
 # Usage:   ./train.sh <python_exe_with_pointcept> <pointcept_repo_dir>
 #
 set -euo pipefail
@@ -119,7 +119,7 @@ cd "$PTC"
 
 
 _TRAIN_BAT_TEMPLATE = """@echo off
-REM 3Photon -> PTv3 training launcher (Windows).
+REM Lithium -> PTv3 training launcher (Windows).
 REM Usage:  train.bat <python_exe_with_pointcept> <pointcept_repo_dir>
 
 setlocal enabledelayedexpansion
@@ -180,9 +180,9 @@ def write_handoff_scripts(dataset_dir: str,
                           run_name: str = "run_001") -> dict:
     """Write ``train.sh``, ``train.bat``, and ``README.md`` into the export dir.
 
-    Also copies ``three_photon_dataset.py`` from ``pointcept_ext/``
+    Also copies ``lithium_dataset.py`` from ``pointcept_ext/``
     next to the scripts so the handoff bundle is fully self-contained
-    — the user doesn't need 3Photon itself installed on the GPU box,
+    — the user doesn't need Lithium itself installed on the GPU box,
     just Pointcept.
 
     Returns a dict of the paths written for the caller to log.
@@ -193,9 +193,9 @@ def write_handoff_scripts(dataset_dir: str,
     # Copy the custom dataset module into the handoff bundle.
     src_dataset = os.path.join(
         os.path.dirname(os.path.abspath(__file__)),
-        "pointcept_ext", "three_photon_dataset.py",
+        "pointcept_ext", "lithium_dataset.py",
     )
-    dst_dataset = os.path.join(dataset_dir, "three_photon_dataset.py")
+    dst_dataset = os.path.join(dataset_dir, "lithium_dataset.py")
     if os.path.isfile(src_dataset):
         with open(src_dataset) as f_in, open(dst_dataset, "w") as f_out:
             f_out.write(f_in.read())

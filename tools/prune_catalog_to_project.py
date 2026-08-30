@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Prune the 3Photon library down to one (or more) projects.
+"""Prune the Lithium library down to one (or more) projects.
 
 Wipes every cloud, label, preview, mesh, primitive set, and project
 that is NOT a member of the named projects. Preserves the named
@@ -18,7 +18,7 @@ Usage::
     # Dry run first — shows what would be removed without touching anything.
     python tools/prune_catalog_to_project.py --project spinelab_4class --dry-run
 
-    # Real run — backs up to ~/.3photon/backups/ then prunes.
+    # Real run — backs up to ~/.lithium/backups/ then prunes.
     python tools/prune_catalog_to_project.py --project spinelab_4class
 
     # Keep multiple projects:
@@ -29,7 +29,7 @@ Project may be either the literal project id (``proj:abc123ef``) or
 the human-readable name. Names get fuzzy-matched against
 ``projects.json`` so a typo with the wrong case still resolves.
 
-Out of scope: this script does NOT touch ``D:\\3Photon\\dataset\\
+Out of scope: this script does NOT touch ``D:\\Lithium\\dataset\\
 training_runs\\`` — the trained model checkpoints live there, and the
 model registry just stores absolute paths to them. After pruning,
 those checkpoints stay reachable for inference / fine-tune. If you
@@ -57,7 +57,7 @@ if str(_REPO_ROOT) not in sys.path:
 from src.data import library_catalog as lc
 
 
-# Per-cloud artifact subdirectories under ~/.3photon/library/.
+# Per-cloud artifact subdirectories under ~/.lithium/library/.
 # Each maps a subdir name to the file extension entries use.
 _PER_CLOUD_SUBDIRS = {
     "data":             ".npz",
@@ -79,7 +79,7 @@ _DERIVED_SUBDIRS = {"primitives", "meshes"}
 
 
 def _backup_library(library_dir: Path) -> Path:
-    """Tar-gz the entire library to ~/.3photon/backups/. Returns path."""
+    """Tar-gz the entire library to ~/.lithium/backups/. Returns path."""
     backups_dir = library_dir.parent / "backups"
     backups_dir.mkdir(parents=True, exist_ok=True)
     ts = int(time.time())

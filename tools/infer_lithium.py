@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Run single-pass inference on a 3Photon-format dataset using a trained
+"""Run single-pass inference on a Lithium-format dataset using a trained
 PT-v3 checkpoint.
 
 Sister of ``tools/infer_s3dis.py`` — same single-pass voxel inference, but
@@ -7,9 +7,9 @@ parameterised for our model architecture (in_channels=9 with normals, our
 own ``Vertebrae`` pdnorm condition) and num_classes auto-detected from
 the dataset's ``classes.json`` sidecar.
 
-Usage (run inside the 3photon-ptv3 conda env):
+Usage (run inside the lithium-ptv3 conda env):
 
-    python tools/infer_3photon.py \\
+    python tools/infer_lithium.py \\
         --checkpoint dataset/training_runs/<run>/model/model_best.pth \\
         --data-root dataset \\
         --split test \\
@@ -27,7 +27,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
-# Add Pointcept + the 3Photon pointcept_ext dir to path so the dataset
+# Add Pointcept + the Lithium pointcept_ext dir to path so the dataset
 # class is registered (mirrors what the training runner does for the
 # main process — inference doesn't need DataLoader workers, so the
 # worker_init shim isn't required here).
@@ -52,7 +52,7 @@ def load_classes_json(data_root: str) -> dict:
 
 
 def build_model(checkpoint_path: str, num_classes: int):
-    """Build PT-v3m1 with the same architecture used by 3Photon training."""
+    """Build PT-v3m1 with the same architecture used by Lithium training."""
     from pointcept.models import build_model as _build_model
 
     model_cfg = dict(
@@ -170,9 +170,9 @@ def predict_scene(model, scene: dict, grid_size: float) -> np.ndarray:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="3Photon PT-v3 inference")
+    parser = argparse.ArgumentParser(description="Lithium PT-v3 inference")
     parser.add_argument("--checkpoint", required=True, help="model_best.pth path")
-    parser.add_argument("--data-root", required=True, help="3Photon dataset root")
+    parser.add_argument("--data-root", required=True, help="Lithium dataset root")
     parser.add_argument("--split", default="test", help="train / val / test")
     parser.add_argument("--output", required=True, help="prediction output dir")
     parser.add_argument("--grid-size", type=float, default=GRID_SIZE_DEFAULT,
@@ -195,14 +195,14 @@ def main():
             json.dump(meta, f, indent=2)
         print(f"Wrote {out_classes}")
 
-    # Three_photon_dataset import isn't strictly needed here (we're not
+    # lithium_dataset import isn't strictly needed here (we're not
     # going through Pointcept's DataLoader) but importing it is cheap and
     # mirrors training so future expansion of the inference path stays
     # consistent.
     try:
-        import three_photon_dataset  # noqa: F401
+        import lithium_dataset  # noqa: F401
     except Exception as e:
-        print(f"[warn] three_photon_dataset import failed: {e}")
+        print(f"[warn] lithium_dataset import failed: {e}")
 
     print(f"Loading model from {args.checkpoint} ...")
     model = build_model(args.checkpoint, num_classes=num_classes)

@@ -2,7 +2,7 @@
 """Import clouds/projects from a foreign 1.0/1.1 library into the live one.
 
 Use cases: pulling projects out of a backup (e.g. a home-backup
-snapshot of ~/.3photon), merging a THREEPHOTON_LIBRARY_DIR side
+snapshot of ~/.lithium), merging a LITHIUM_LIBRARY_DIR side
 library, or migrating from another machine.
 
 Strictly additive: file_keys already present in the live library are

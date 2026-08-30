@@ -1,6 +1,6 @@
 """Annotation project persistence: save, load, and autosave.
 
-Project directory layout (name.3photon/):
+Project directory layout (name.lithium/):
     project.json      — metadata, cloud paths, settings
     registry.json     — label registry (hierarchy, colors, flags)
     labels/
@@ -37,7 +37,7 @@ def _atomic_save_npy(path: str, array: np.ndarray) -> None:
     os.replace(actual_tmp, path)
 
 PROJECT_VERSION = 1
-PROJECT_EXT = ".3photon"
+PROJECT_EXT = ".lithium"
 
 
 class AnnotationProject:

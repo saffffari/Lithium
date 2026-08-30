@@ -6,7 +6,7 @@ Models the Contact Sheet's backing store on Adobe Lightroom's library:
     PROJECTS     — user-defined, drag-to-organize groupings with ontology
     SMART        — "All Photos" and "Recent Imports" virtual views
 
-The library persists across sessions under ``~/.3photon/library/``:
+The library persists across sessions under ``~/.lithium/library/``:
 
     index.json        metadata for every known cloud (file_key → entry dict)
     projects.json     user projects (id → {name, file_keys, ontology, settings})

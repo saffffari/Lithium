@@ -63,7 +63,7 @@ def test_config_class_map_is_recovered_from_training_snapshot(tmp_path: Path):
         "data = dict(\n"
         "  num_classes=3,\n"
         "  names=['Rest', 'Endplate', 'BodyWall'],\n"
-        "  train=dict(type='ThreePhotonDataset'),\n"
+        "  train=dict(type='LithiumDataset'),\n"
         ")\n"
     )
     assert _extract_config_names(config) == ENDPLATE3

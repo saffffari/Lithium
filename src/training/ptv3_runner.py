@@ -238,7 +238,7 @@ class PointceptLaunchConfig:
 
     ``python_exe`` is a full path to the Python interpreter in the
     training env. Examples:
-      - conda on Windows: ``<miniforge>\\envs\\3photon-train\\python.exe``
+      - conda on Windows: ``<miniforge>\\envs\\lithium-train\\python.exe``
       - WSL2 Ubuntu:      ``wsl.exe -e /home/<user>/.venv-train/bin/python``
         (we pass the whole command verbatim; the launcher splits on
          spaces so WSL-style invocations work as a single string.)
@@ -264,10 +264,10 @@ class PointceptLaunchConfig:
     env: dict[str, str] = field(default_factory=dict)
     # Optional extra CLI args forwarded to train.py verbatim.
     extra_args: list[str] = field(default_factory=list)
-    # Optional dir containing 3Photon's Pointcept extensions (custom
+    # Optional dir containing Lithium's Pointcept extensions (custom
     # dataset class etc.). When set, the runner bootstraps an import
-    # of three_photon_dataset before invoking tools/train.py so the
-    # ThreePhotonDataset class is in Pointcept's DATASETS registry by
+    # of lithium_dataset before invoking tools/train.py so the
+    # LithiumDataset class is in Pointcept's DATASETS registry by
     # the time the trainer builds the dataloader. Required because
     # Pointcept's Config.dump() strips bare ``__import__`` expressions
     # from the generated config (yapf can't serialise them), so any
@@ -463,14 +463,14 @@ class PointceptRunner:
             # is what makes ``num_worker > 0`` safe on Windows. Each
             # DataLoader worker spawns a fresh Python interpreter, so the
             # main-process bootstrap import is gone — without this patch
-            # workers re-raise "ThreePhotonDataset not in registry". The
+            # workers re-raise "LithiumDataset not in registry". The
             # patched function re-prepends the ext dir and re-imports
-            # three_photon_dataset before delegating to the original
+            # lithium_dataset before delegating to the original
             # seed-setter, which is what the worker actually needs.
             bootstrap = "\n".join([
                 "import sys, runpy",
                 f"sys.path.insert(0, r'{ext_dir}')",
-                "import three_photon_dataset",
+                "import lithium_dataset",
                 # Replace Pointcept's worker_init_fn with one that re-imports
                 # our dataset class on every worker startup. The replacement
                 # function lives in a real module file (worker_init.py) so

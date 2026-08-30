@@ -1,9 +1,9 @@
 # Training Environment Setup
 
-3Photon's viz app is torch-free on purpose — the main `.venv` only
+Lithium's viz app is torch-free on purpose — the main `.venv` only
 needs numpy, moderngl, imgui, laspy, plyfile. Training happens in a
 **separate conda env** that has PyTorch, CUDA, and Pointcept, and
-3Photon subprocesses into it via `src/training/ptv3_runner.py`. This
+Lithium subprocesses into it via `src/training/ptv3_runner.py`. This
 keeps the viz env from breaking every time a ML dependency drifts.
 
 This document is the reproducible recipe for that training env.
@@ -19,17 +19,17 @@ so nvcc 12.4 and gcc 13 live inside the env:
 curl -fsSL https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh -o /tmp/miniforge.sh
 bash /tmp/miniforge.sh -b -p ~/miniforge3
 
-~/miniforge3/bin/conda create -n 3photon-ptv3 python=3.11 -y
-ENVP=~/miniforge3/envs/3photon-ptv3
+~/miniforge3/bin/conda create -n lithium-ptv3 python=3.11 -y
+ENVP=~/miniforge3/envs/lithium-ptv3
 
 # Pinned known-good torch
 $ENVP/bin/pip install torch==2.5.1 torchvision==0.20.1 \
     --index-url https://download.pytorch.org/whl/cu124
 
 # nvcc 12.4 + gcc 13 inside the env (for the pointops build)
-~/miniforge3/bin/conda install -n 3photon-ptv3 \
+~/miniforge3/bin/conda install -n lithium-ptv3 \
     -c nvidia/label/cuda-12.4.1 cuda-toolkit -y
-~/miniforge3/bin/conda install -n 3photon-ptv3 \
+~/miniforge3/bin/conda install -n lithium-ptv3 \
     -c conda-forge gcc_linux-64=13 gxx_linux-64=13 -y
 
 # Remaining deps (peft + wandb are new hard imports in the pinned
@@ -52,7 +52,7 @@ env PYTHONPATH=$PWD:../.. $ENVP/bin/python ../../tools/test_generated_config.py
 ```
 
 Then set `train_python_exe` / `train_pointcept_dir` in
-`~/.3photon/prefs.json` (or via TRAIN tab → POINTCEPT ENV) to
+`~/.lithium/prefs.json` (or via TRAIN tab → POINTCEPT ENV) to
 `$ENVP/bin/python` and `<repo>/training/pointcept`.
 
 The Windows recipe below remains valid for the Windows box.
@@ -70,8 +70,8 @@ The Windows recipe below remains valid for the Windows box.
 ## Step 1 — Conda env
 
 ```cmd
-conda create -n 3photon-ptv3 python=3.11 -y
-conda activate 3photon-ptv3
+conda create -n lithium-ptv3 python=3.11 -y
+conda activate lithium-ptv3
 ```
 
 ## Step 2 — PyTorch + CUDA 12.4
@@ -116,12 +116,12 @@ back to standard caching when it's missing.
 Pointcept is cloned as a sibling inside the project:
 
 ```cmd
-cd D:\3Photon
+cd D:\Lithium
 git clone https://github.com/Pointcept/Pointcept.git training\pointcept
 ```
 
 Note: `training/` is in `.gitignore`. The clone is a local-only
-sibling — it never enters 3Photon's git history.
+sibling — it never enters Lithium's git history.
 
 ## Step 6 — Patch `libs/pointops/setup.py` on Windows
 
@@ -153,7 +153,7 @@ need to be reapplied until the upstream fix lands (or we submit it).
 ## Step 7 — Build `pointops` CUDA extension
 
 ```cmd
-cd D:\3Photon\training\pointcept\libs\pointops
+cd D:\Lithium\training\pointcept\libs\pointops
 python setup.py install
 ```
 
@@ -174,14 +174,14 @@ Pointcept has no `setup.py` at its root; their install pattern is
 this automatically, but to verify the env manually:
 
 ```cmd
-cd D:\3Photon\training\pointcept
+cd D:\Lithium\training\pointcept
 set PYTHONPATH=%CD%
-python D:\3Photon\tools\probe_pointcept.py
+python D:\Lithium\tools\probe_pointcept.py
 ```
 
 Expected output:
 ```
-pointcept module path: D:\3Photon\training\pointcept\pointcept\__init__.py
+pointcept module path: D:\Lithium\training\pointcept\pointcept\__init__.py
 MODELS registered: 60
 DATASETS registered: 31
 PT-v3m1 registered: True
@@ -192,13 +192,13 @@ OK: pointcept env ready
 
 ## Step 9 — End-to-end smoke test
 
-Generates a fake 3Photon export, runs our config generator on it,
+Generates a fake Lithium export, runs our config generator on it,
 feeds the config to Pointcept, and instantiates PT-v3m1:
 
 ```cmd
-cd D:\3Photon\training\pointcept
+cd D:\Lithium\training\pointcept
 set PYTHONPATH=%CD%
-python D:\3Photon\tools\test_generated_config.py
+python D:\Lithium\tools\test_generated_config.py
 ```
 
 Expected final line:
@@ -211,33 +211,33 @@ SUCCESS
 
 Once the env is set up, the normal flow is:
 
-1. Label point clouds in 3Photon.
+1. Label point clouds in Lithium.
 2. Export a dataset via `export_dataset(...)` — writes the
    `train/val/test/scene_*/` tree plus `classes.json`.
 3. Generate a Pointcept config:
    ```python
    from src.training.config_gen import PTv3TrainParams, generate_ptv3_config
-   params = PTv3TrainParams(data_root="D:/3Photon/exports/my_run",
+   params = PTv3TrainParams(data_root="D:/Lithium/exports/my_run",
                             num_classes=0,  # auto-load from classes.json
                             batch_size=32, epochs=200)
    generate_ptv3_config(params,
-                        r"D:\3Photon\src\training\pointcept_ext",
-                        r"D:\3Photon\training\runs\my_run\config.py")
+                        r"D:\Lithium\src\training\pointcept_ext",
+                        r"D:\Lithium\training\runs\my_run\config.py")
    ```
 4. Launch:
    ```python
    from src.training.ptv3_runner import PointceptRunner, PointceptLaunchConfig
    cfg = PointceptLaunchConfig(
-       python_exe=r"C:\Users\<you>\miniforge3\envs\3photon-ptv3\python.exe",
-       pointcept_dir=r"D:\3Photon\training\pointcept",
-       config_file=r"D:\3Photon\training\runs\my_run\config.py",
-       work_dir=r"D:\3Photon\training\runs\my_run",
+       python_exe=r"C:\Users\<you>\miniforge3\envs\lithium-ptv3\python.exe",
+       pointcept_dir=r"D:\Lithium\training\pointcept",
+       config_file=r"D:\Lithium\training\runs\my_run\config.py",
+       work_dir=r"D:\Lithium\training\runs\my_run",
    )
    PointceptRunner().launch(cfg)
    ```
 5. After training, take the best checkpoint + a prediction `.npy`
    from a test run and feed them to `import_predictions()` back in
-   3Photon to close the loop.
+   Lithium to close the loop.
 
 ## Known issues
 
@@ -250,7 +250,7 @@ Once the env is set up, the normal flow is:
   fine without it; `enable_flash=False` is the `config_gen.py`
   default.
 - **sharedarray not installed** — expected on Windows. Pointcept's
-  default datasets have a fallback. Our `ThreePhotonDataset` doesn't
+  default datasets have a fallback. Our `LithiumDataset` doesn't
   use sharedarray at all.
 
 ## Required launch parameters (regression-prone)
@@ -261,7 +261,7 @@ Per `project_ptv3_training_realities` memory and the wave-2 audit
 - **`pointcept_ext_dir`** must be passed to `PointceptLaunchConfig`. If
   omitted, `_build_command` at `ptv3_runner.py:458` skips the
   `python -u -c <bootstrap>` block and the dataloader fails with
-  `KeyError('ThreePhotonDataset')`. The TRAIN-tab button,
+  `KeyError('LithiumDataset')`. The TRAIN-tab button,
   `tools/launch_training.py`, and the CLI `train` subcommand all pass
   it correctly.
 - **`grid_size=0.5`** mm (NOT meters — point clouds here are ~50-80 mm
@@ -270,4 +270,4 @@ Per `project_ptv3_training_realities` memory and the wave-2 audit
 - **`extent / grid_size < 65536`** or Pointcept's depth assertion fires.
 - **`PYTHONIOENCODING=utf-8`** in subprocess env — default cp1252 chokes
   on tqdm em-dashes and crashes the reader thread.
-- Conda env name: **`3photon-ptv3`**.
+- Conda env name: **`lithium-ptv3`**.

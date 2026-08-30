@@ -1,6 +1,6 @@
 """Cross-session persistence for the label taxonomy (LabelRegistry).
 
-A single default schema file at ``~/.3photon/schema.json`` is auto-saved
+A single default schema file at ``~/.lithium/schema.json`` is auto-saved
 every time the registry is mutated and auto-loaded at app start when no
 project is being opened. This lets the user define their anatomical
 label set once and have it available for every new vertebra mesh they
@@ -21,7 +21,7 @@ from pathlib import Path
 from src.data.labels import LabelRegistry
 
 
-SCHEMA_DIR = Path.home() / ".3photon"
+SCHEMA_DIR = Path.home() / ".lithium"
 SCHEMA_PATH = SCHEMA_DIR / "schema.json"
 
 

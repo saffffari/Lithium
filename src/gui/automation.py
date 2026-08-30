@@ -1,4 +1,4 @@
-"""Automation CLI engine for 3Photon — interactive command interface."""
+"""Automation CLI engine for Lithium — interactive command interface."""
 
 import os
 import shlex
@@ -23,7 +23,7 @@ class CLIEngine:
         # which avoids the stale scroll_max_y race.
         self._pending_scroll: bool = False
         self._register_commands()
-        self.log("3Photon Automation Console", "success")
+        self.log("Lithium Automation Console", "success")
         self.log("Type 'help' for available commands.", "info")
 
     def _register_commands(self):
@@ -853,7 +853,7 @@ class CLIEngine:
 
         Without --confirm: print a summary of what would be lost so the
         user can review before committing. With --confirm: tar.gz the
-        whole catalog to ~/.3photon/backups/library_<ts>.tar.gz, then
+        whole catalog to ~/.lithium/backups/library_<ts>.tar.gz, then
         clear data/, labels/, previews/, index.json, schema.json,
         projects.json, and the .lock file. The empty subdirectory
         skeleton is left in place. App state (loaded clouds, registry)
@@ -875,7 +875,7 @@ class CLIEngine:
             return
 
         if not confirm:
-            self.log("wipe-catalog will erase the entire 3Photon library:", "info")
+            self.log("wipe-catalog will erase the entire Lithium library:", "info")
             self.log(f"  {format_integrity_summary(status)}", "info")
             size_bytes = estimate_catalog_size()
             if size_bytes > 0:

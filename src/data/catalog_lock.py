@@ -1,8 +1,8 @@
-"""Single-instance lock for the 3Photon library catalog.
+"""Single-instance lock for the Lithium library catalog.
 
-A lock file at ``~/.3photon/library/.lock`` carries the PID of the
+A lock file at ``~/.lithium/library/.lock`` carries the PID of the
 process that owns the catalog. On startup we acquire it; on clean exit
-we release it. A second 3Photon launch detects the lock, checks whether
+we release it. A second Lithium launch detects the lock, checks whether
 the recorded PID is still alive, and either:
 
 - refuses to start (if the other instance is genuinely running), or
@@ -97,7 +97,7 @@ def acquire_lock() -> tuple[bool, int | None]:
     Returns ``(success, blocking_pid)``:
 
     - ``(True, None)``  — lock acquired (clean state, or stale lock cleared).
-    - ``(False, pid)``  — refused; another live 3Photon instance owns it.
+    - ``(False, pid)``  — refused; another live Lithium instance owns it.
 
     Implementation: read the lock file if present, decode the recorded
     PID, check liveness. If alive, refuse. If dead, overwrite. Either

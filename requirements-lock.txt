@@ -11,6 +11,8 @@ plyfile==1.1.4
 pygltflib==1.16.5
 pyinstaller==6.21.0
 pyinstaller-hooks-contrib==2026.6
+pyopengl==3.1.10
+pyopengl-accelerate==3.1.10
 rendercanvas==2.7.1
 scipy==1.18.0
 trimesh==4.12.2

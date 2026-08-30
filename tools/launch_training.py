@@ -48,10 +48,10 @@ def main():
     ap.add_argument("--run-name", default=None,
                     help="custom run dir name; default uses timestamp")
     ap.add_argument("--python-exe",
-                    default=os.environ.get("THREEPHOTON_TRAIN_PYTHON", ""),
+                    default=os.environ.get("LITHIUM_TRAIN_PYTHON", ""),
                     help="Python interpreter of the training env "
-                         "(conda env 3photon-ptv3). Falls back to the "
-                         "THREEPHOTON_TRAIN_PYTHON env var; required "
+                         "(conda env lithium-ptv3). Falls back to the "
+                         "LITHIUM_TRAIN_PYTHON env var; required "
                          "one way or the other.")
     ap.add_argument("--pointcept-dir", default=str(ROOT / "training" / "pointcept"))
     ap.add_argument("--pointcept-ext-dir",
@@ -76,7 +76,7 @@ def main():
                          "consistently-oriented supine CT data.")
     args = ap.parse_args()
     if not args.python_exe:
-        ap.error("--python-exe (or THREEPHOTON_TRAIN_PYTHON) is required "
+        ap.error("--python-exe (or LITHIUM_TRAIN_PYTHON) is required "
                  "— point it at the training env's interpreter; see "
                  "docs/training_setup.md")
 
@@ -140,7 +140,7 @@ def main():
     bootstrap = "\n".join([
         "import sys, runpy",
         f"sys.path.insert(0, r'{ext}')",
-        "import three_photon_dataset",
+        "import lithium_dataset",
         "import pointcept.engines.defaults as _pcd",
         "from worker_init import photon_worker_init_fn as _3p_wif",
         "_pcd.worker_init_fn = _3p_wif",

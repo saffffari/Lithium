@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the Deepfield PTv3 workspace inside a 3Photon 1.1 catalog.
+"""Build the Deepfield PTv3 workspace inside a Lithium 1.1 catalog.
 
 The migration is deliberately additive:
 
@@ -35,11 +35,11 @@ from plyfile import PlyData
 
 
 _default_repo = Path(__file__).resolve().parent.parent
-if not (_default_repo / "src").is_dir() and Path("/home/alex/3Photon_1.1/src").is_dir():
-    _default_repo = Path("/home/alex/3Photon_1.1")
-REPO = Path(os.environ.get("THREEPHOTON_REPO", str(_default_repo))).expanduser().resolve()
+if not (_default_repo / "src").is_dir() and Path("/home/alex/Lithium/src").is_dir():
+    _default_repo = Path("/home/alex/Lithium")
+REPO = Path(os.environ.get("LITHIUM_REPO", str(_default_repo))).expanduser().resolve()
 SPINELAB_ARCHIVE = Path("/home/alex/Projects/spinelab")
-VERSE = Path("/run/media/alex/citadel/data/verse")
+VERSE = Path("/citadel/data/verse")
 GOLD_ROOT = SPINELAB_ARCHIVE / "cloud_models/yamato_gold247_v1"
 GOLD_DATASET = GOLD_ROOT / "dataset"
 
@@ -286,13 +286,11 @@ def _best_miou(log: Path) -> float:
 
 def _discover_board_root() -> Path:
     candidates = [
-        Path("/run/media/alex/board_rack/3Photon"),
-        Path("/run/media/alex/board-rack/3Photon"),
-    ]
+                    ]
     for candidate in candidates:
         if candidate.is_dir():
             return candidate
-    raise FileNotFoundError("3Photon archive is not mounted under board_rack or board-rack")
+    raise FileNotFoundError("Lithium archive is not mounted under /board_rack/Lithium")
 
 
 def _model_target(names: tuple[str, ...]) -> tuple[str, str]:
@@ -330,13 +328,13 @@ def _model_target(names: tuple[str, ...]) -> tuple[str, str]:
         "from the active training projects"
     )
     if names and _norm_names((names[0],))[0] != "unlabeled":
-        reason += "; output channel 0 is anatomical but 3Photon reserves label 0 for the background role"
+        reason += "; output channel 0 is anatomical but Lithium reserves label 0 for the background role"
     return target, reason
 
 
 def _discover_models(board_root: Path) -> list[ModelPlan]:
     runs: list[Path] = []
-    for run in sorted(board_root.glob("dataset*/training_runs/*")):
+    for run in sorted((board_root.parent / "training_runs").glob("*")):
         if (run / "model/model_best.pth").is_file():
             runs.append(run)
     local = REPO / "dataset_32k_endplate3class/training_runs/endplate3_v11_200ep"
@@ -684,9 +682,9 @@ def _build_plan(library: Path) -> MigrationPlan:
 def _assert_app_closed(library: Path) -> None:
     lock = library / ".lock"
     if lock.exists():
-        raise RuntimeError(f"3Photon catalog lock is present: {lock}")
+        raise RuntimeError(f"Lithium catalog lock is present: {lock}")
     result = subprocess.run(
-        ["pgrep", "-af", "-i", "3Photon|pointcept"],
+        ["pgrep", "-af", "-i", "Lithium|pointcept"],
         capture_output=True,
         text=True,
         check=False,
@@ -701,7 +699,7 @@ def _assert_app_closed(library: Path) -> None:
         and "codex" not in line.lower()
     ]
     if active:
-        raise RuntimeError("3Photon/Pointcept appears active:\n" + "\n".join(active))
+        raise RuntimeError("Lithium/Pointcept appears active:\n" + "\n".join(active))
 
 
 def _backup(library: Path) -> Path:
@@ -736,7 +734,7 @@ def _load_preview_positions(path: Path) -> np.ndarray:
 
 
 def _apply(plan: MigrationPlan, skip_cache: bool, skip_preview_labels: bool) -> dict:
-    os.environ["THREEPHOTON_LIBRARY_DIR"] = str(plan.library)
+    os.environ["LITHIUM_LIBRARY_DIR"] = str(plan.library)
     sys.path.insert(0, str(REPO))
     from scipy.spatial import cKDTree
     from src.data import cloud_store
@@ -970,8 +968,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n", 1)[0])
     parser.add_argument(
         "--library",
-        default=os.environ.get("THREEPHOTON_LIBRARY_DIR", str(Path.home() / ".3photon/library")),
-        help="3Photon 1.1 catalog root",
+        default=os.environ.get("LITHIUM_LIBRARY_DIR", str(Path.home() / ".lithium/library")),
+        help="Lithium 1.1 catalog root",
     )
     parser.add_argument("--apply", action="store_true", help="perform the additive migration")
     parser.add_argument(

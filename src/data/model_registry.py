@@ -1,7 +1,7 @@
 """Per-project model registry: track trained models, checkpoints, and lineage.
 
 Each project can have multiple trained models. Models are stored in
-``~/.3photon/library/models/{project_id}.json`` — one file per project,
+``~/.lithium/library/models/{project_id}.json`` — one file per project,
 lazy-loaded when the TRAIN tab opens.
 
 Persistence follows the same atomic-write pattern as project.py.

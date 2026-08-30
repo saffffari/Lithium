@@ -1,4 +1,4 @@
-"""Schema persistence verification — ~/.3photon/schema.json round-trip."""
+"""Schema persistence verification — ~/.lithium/schema.json round-trip."""
 
 import sys
 import os

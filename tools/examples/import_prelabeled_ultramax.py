@@ -1,10 +1,10 @@
-"""Import the 214 ultramax-prelabeled VerSe bones into a 3Photon catalog project,
+"""Import the 214 ultramax-prelabeled VerSe bones into a Lithium catalog project,
 WITH the ultramax predictions as editable starting labels + the ultramax checkpoint attached.
 
-Why a bespoke importer: 3Photon's ``load_ply`` deliberately DROPS the PLY 'label' field
+Why a bespoke importer: Lithium's ``load_ply`` deliberately DROPS the PLY 'label' field
 (every imported point lands Unlabeled), and none of the 5 stock tools call
 ``save_cloud_labels`` from a PLY's own label field. This reuses the exact catalog
-primitives (so the result auto-registers identically under ~/.3photon/library/) and adds
+primitives (so the result auto-registers identically under ~/.lithium/library/) and adds
 the one missing ``save_cloud_labels`` call so the ultramax predictions become the
 *correctable starting labels* the user edits in the GUI.
 
@@ -12,7 +12,7 @@ Purely ADDITIVE + idempotent: each bone is content-hashed (re-run dedupes), a pr
 reused by name if it already exists, and existing clouds/projects are never touched.
 
 Run (app MUST be closed — single-instance catalog):
-    /run/media/alex/board_rack/3Photon/.venv/bin/python tools/import_prelabeled_ultramax.py
+    ~/Lithium/.venv/bin/python tools/import_prelabeled_ultramax.py
     # add --dry-run to preview without writing
 """
 import sys
@@ -22,7 +22,7 @@ from pathlib import Path
 import numpy as np
 from plyfile import PlyData
 
-TP = Path("/run/media/alex/board_rack/3Photon")
+TP = Path.home() / "Lithium"
 sys.path.insert(0, str(TP))
 
 from src.data import library_paths
@@ -32,9 +32,9 @@ from src.data.cloud_store import save_cloud_data, save_cloud_labels
 from src.data.labels import LabelRegistry
 from src.data.model_registry import ProjectModelRegistry, TrainedModel
 
-SRC = Path("/run/media/alex/citadel/data/verse/exports_32k_prelabeled")
+SRC = Path("/citadel/data/verse/exports_32k_prelabeled")
 PROJECT_NAME = "verse_supermax_prelabel"
-CKPT_DIR = TP / "dataset_32k/training_runs/fight_club_ultramax_1778969431"
+CKPT_DIR = Path("/board_rack/Lithium/training_runs/fight_club_ultramax_1778969431")
 CKPT = CKPT_DIR / "model/model_best.pth"
 
 # Ontology. Ids 1-5 = dataset_32k/classes.json (NAMES must match the ultramax model's
@@ -152,7 +152,7 @@ def main() -> int:
     for c in range(len(NAMES)):
         print(f"  {c}  {NAMES[c]:18} {hist[c]:>11,}  ({100 * hist[c] / tot:5.1f}%)")
     if not args.dry_run:
-        print(f"\nOpen 3Photon ({TP}/run.sh), pick project '{PROJECT_NAME}', "
+        print(f"\nOpen Lithium (~/Lithium/run.sh), pick project '{PROJECT_NAME}', "
               f"and correct the seeds. Run-Inference uses the attached ultramax model.")
     return 0
 

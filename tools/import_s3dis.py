@@ -1,9 +1,9 @@
 #!/usr/bin/env python
-"""Import pre-processed S3DIS scenes into 3Photon-compatible PLY files.
+"""Import pre-processed S3DIS scenes into Lithium-compatible PLY files.
 
 Reads the Pointcept-format per-room directories (coord.npy, color.npy,
 segment.npy) and writes PLY + companion _labels.npy for each room.
-3Photon auto-detects the companion labels on import.
+Lithium auto-detects the companion labels on import.
 
 Setup
 -----
@@ -14,7 +14,7 @@ Setup
 2. Run this script:
        python tools/import_s3dis.py <path_to_s3dis> --output <output_dir>
 
-3. Open the output folder in 3Photon.
+3. Open the output folder in Lithium.
 
 The 13 S3DIS classes:
     0 ceiling, 1 floor, 2 wall, 3 beam, 4 column, 5 window,
@@ -85,8 +85,8 @@ def convert_scene(info: dict, output_dir: str) -> dict:
     seg_path = os.path.join(scene_dir, "segment.npy")
     if os.path.exists(seg_path):
         labels = np.load(seg_path).astype(np.int32).ravel()
-        # S3DIS uses 0-indexed classes, shift to 1-indexed for 3Photon
-        # (0 = unlabeled in 3Photon)
+        # S3DIS uses 0-indexed classes, shift to 1-indexed for Lithium
+        # (0 = unlabeled in Lithium)
         labels = labels + 1
     else:
         labels = np.zeros(len(coord), dtype=np.int32)
@@ -125,7 +125,7 @@ def write_ontology(output_dir: str):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Convert pre-processed S3DIS to 3Photon PLY files.")
+        description="Convert pre-processed S3DIS to Lithium PLY files.")
     parser.add_argument("s3dis_root", type=str,
                         help="Path to pre-processed S3DIS (contains Area_*/room_*/coord.npy)")
     parser.add_argument("--output", "-o", type=str, default=None,

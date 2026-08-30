@@ -1,14 +1,14 @@
 #!/usr/bin/env python
 """Bake prediction .npy files back into PLY point clouds for visualisation.
 
-After running ``tools/infer_3photon.py`` you have per-scene predictions at
+After running ``tools/infer_lithium.py`` you have per-scene predictions at
 the voxel-downsampled resolution of the staged dataset. Those predictions
 can't be applied to the original full-resolution clouds without a spatial
 mapping, but they CAN be visualised at the staged resolution by writing
 each scene back out as a PLY with vertex colors taken from the predicted
 class palette.
 
-The resulting PLYs drop straight into 3Photon via File → Import File and
+The resulting PLYs drop straight into Lithium via File → Import File and
 display the model's segmentation as point colors — no label registry
 import needed.
 
@@ -56,7 +56,7 @@ def write_ply(path: str, coord: np.ndarray, color_u8: np.ndarray) -> None:
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--dataset", required=True, help="3Photon dataset root")
+    ap.add_argument("--dataset", required=True, help="Lithium dataset root")
     ap.add_argument("--predictions", required=True, help="predictions dir")
     ap.add_argument("--split", default="test", help="train/val/test")
     ap.add_argument("--output", required=True, help="output dir for PLYs")

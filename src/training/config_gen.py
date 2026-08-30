@@ -9,7 +9,7 @@ our setup:
   - our class id convention (IGNORE_INDEX=255, contiguous 0..K-1)
   - our exported directory layout (``train/val/test/scene_*/``)
   - our custom dataset class registered in
-    ``src/training/pointcept_ext/three_photon_dataset.py``
+    ``src/training/pointcept_ext/lithium_dataset.py``
 
 The config is written into the run's work_dir as ``config.py`` and
 also contains a header block recording every input knob so a user
@@ -94,7 +94,7 @@ class PTv3TrainParams:
                                    # checking nvidia-smi headroom.
     num_worker: int = 4           # The runner monkey-patches Pointcept's
                                    # worker_init_fn to re-import our
-                                   # ThreePhotonDataset class, so DataLoader
+                                   # LithiumDataset class, so DataLoader
                                    # workers (spawn-mode on Windows) end up
                                    # with the class registered just like
                                    # the main process. See ptv3_runner.py.
@@ -163,7 +163,7 @@ def generate_ptv3_config(params: PTv3TrainParams,
 
     ``pointcept_ext_dir`` is the absolute path to our custom dataset
     module directory. The generated config will insert it at the top
-    of ``sys.path`` before importing ``three_photon_dataset`` so
+    of ``sys.path`` before importing ``lithium_dataset`` so
     Pointcept's DATASETS registry picks up our class.
 
     Returns the generated config source for callers that want to log
@@ -196,7 +196,7 @@ def generate_ptv3_config(params: PTv3TrainParams,
     transforms_val = _build_transform_pipeline(params, training=False,
                                                 feat_keys=feat_keys)
 
-    source = f'''"""Generated 3Photon PTv3 training config.
+    source = f'''"""Generated Lithium PTv3 training config.
 
 DO NOT EDIT BY HAND - regenerate with src/training/config_gen.py.
 Parameters at generation time:
@@ -205,13 +205,13 @@ Parameters at generation time:
 
 # Pointcept's Config.fromfile captures every top-level name in the
 # module dict and tries to yapf-format it back on dump. That means
-# we cannot have ``import sys`` or ``import three_photon_dataset``
+# we cannot have ``import sys`` or ``import lithium_dataset``
 # as top-level statements - yapf can't serialize a module object.
 # Instead we use bare __import__ expressions which fire the side
 # effect (sys.path mutation, dataset registry registration) without
 # binding any name at module scope.
 __import__("sys").path.insert(0, r"{pointcept_ext_dir}")
-__import__("three_photon_dataset")
+__import__("lithium_dataset")
 
 # ---------------------------------------------------------------------------
 # Run (matches pointcept/configs/_base_/default_runtime.py fields)
@@ -241,7 +241,7 @@ empty_cache = {params.empty_cache}
 empty_cache_per_epoch = True
 find_unused_parameters = False
 enable_wandb = False
-wandb_project = "3photon"
+wandb_project = "lithium"
 wandb_key = None
 mix_prob = {params.mix_prob}
 epoch = {params.epochs}
@@ -313,9 +313,9 @@ scheduler = dict(
 param_dicts = [dict(keyword="block", lr={params.base_lr} * 0.1)]
 
 # ---------------------------------------------------------------------------
-# Dataset - 3Photon export format
+# Dataset - Lithium export format
 # ---------------------------------------------------------------------------
-dataset_type = "ThreePhotonDataset"
+dataset_type = "LithiumDataset"
 data_root = r"{data_root}"
 
 data = dict(
@@ -356,8 +356,8 @@ hooks = [
     # run_1778447686 even though training had completed cleanly. The
     # tester block below stays so the schema is well-formed, but with
     # no hook to invoke it the run exits with returncode 0 after the
-    # final checkpoint save. 3Photon has its own inference path
-    # (tools/infer_3photon.py via _launch_inference) so the post-train
+    # final checkpoint save. Lithium has its own inference path
+    # (tools/infer_lithium.py via _launch_inference) so the post-train
     # test pass was never load-bearing for us.
 ]
 

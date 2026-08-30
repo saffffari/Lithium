@@ -63,7 +63,7 @@ _LABELS = [
 # Inferior / Spinous; pedicles are not in this model's vocabulary, so
 # any pedicle predictions you want need a new training round.
 _DEFAULT_MODEL_WORK_DIR = Path(
-    r"D:/3Photon/dataset/training_runs/tuned_4class_1778457554")
+    r"~/Lithium/dataset/training_runs/tuned_4class_1778457554")
 _DEFAULT_MODEL_NAME = "tuned_4class"
 _DEFAULT_MODEL_CLASSES = [
     "Unlabeled", "Superior_Endplate", "Inferior_Endplate", "Spinous Process",

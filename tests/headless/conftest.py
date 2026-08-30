@@ -35,7 +35,7 @@ def tmp_library(monkeypatch):
     library_catalog all dispatch through library_paths) lands here
     for the lifetime of the test.
     """
-    with tempfile.TemporaryDirectory(prefix="3photon_headless_") as d:
+    with tempfile.TemporaryDirectory(prefix="lithium_headless_") as d:
         # Pre-create the previews/labels/data subdirs so save_cloud_labels
         # never has to mkdir on first write.
         os.makedirs(os.path.join(d, "previews"), exist_ok=True)
@@ -87,7 +87,7 @@ def gl_context():
     glfw.window_hint(glfw.OPENGL_PROFILE, glfw.OPENGL_CORE_PROFILE)
     glfw.window_hint(glfw.OPENGL_FORWARD_COMPAT, True)
     glfw.window_hint(glfw.VISIBLE, False)
-    window = glfw.create_window(1, 1, "3Photon Tier1", None, None)
+    window = glfw.create_window(1, 1, "Lithium Tier1", None, None)
     if not window:
         glfw.terminate()
         pytest.skip("Could not create hidden GLFW window")

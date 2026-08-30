@@ -1,5 +1,5 @@
 """Library directory resolution — the one place that knows where the
-3Photon catalog lives on disk.
+Lithium catalog lives on disk.
 
 Lives in its own module so callers like ``cloud_store`` and
 ``catalog_lock`` can resolve paths without importing
@@ -10,10 +10,10 @@ Tests redirect the catalog directory by monkey-patching
 ``library_paths.library_dir`` (not ``library_catalog.library_dir``,
 which is kept as a thin delegating alias for back-compat).
 
-Production redirection is via the ``THREEPHOTON_LIBRARY_DIR`` env
+Production redirection is via the ``LITHIUM_LIBRARY_DIR`` env
 var — set this when running a dev / sandbox build so it can't
 accidentally touch the shared installer's catalog at
-``~/.3photon/library``. Falls back to the default when unset, so
+``~/.lithium/library``. Falls back to the default when unset, so
 existing installs behave exactly as before.
 """
 
@@ -22,7 +22,7 @@ from __future__ import annotations
 import os
 
 
-_LIBRARY_DIR_ENV = "THREEPHOTON_LIBRARY_DIR"
+_LIBRARY_DIR_ENV = "LITHIUM_LIBRARY_DIR"
 
 
 def library_dir() -> str:
@@ -30,13 +30,13 @@ def library_dir() -> str:
 
     Resolution order:
 
-    1. ``THREEPHOTON_LIBRARY_DIR`` env var if set + non-empty. Lets a
+    1. ``LITHIUM_LIBRARY_DIR`` env var if set + non-empty. Lets a
        worktree / dev build redirect to its own catalog so it can't
        collide with the user's installed app. The env var is expanded
-       through ``os.path.expanduser`` so ``~/.3photon-overnight/library``
+       through ``os.path.expanduser`` so ``~/.lithium-overnight/library``
        works portably.
 
-    2. ``~/.3photon/library`` — the canonical default for any installer
+    2. ``~/.lithium/library`` — the canonical default for any installer
        build. Kept exactly as before this hook landed so existing
        installs see no behaviour change.
 
@@ -48,6 +48,6 @@ def library_dir() -> str:
         d = os.path.expanduser(override)
     else:
         home = os.path.expanduser("~")
-        d = os.path.join(home, ".3photon", "library")
+        d = os.path.join(home, ".lithium", "library")
     os.makedirs(os.path.join(d, "previews"), exist_ok=True)
     return d

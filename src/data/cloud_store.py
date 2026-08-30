@@ -1,19 +1,19 @@
 """Catalog-side storage for full-resolution point clouds and their labels.
 
-The 3Photon catalog *is* the dataset. Once a cloud is imported, its
-positions, colors, scalars, and labels live under ``~/.3photon/library/``
+The Lithium catalog *is* the dataset. Once a cloud is imported, its
+positions, colors, scalars, and labels live under ``~/.lithium/library/``
 keyed by ``file_key``. The original source file (PLY/LAS/NIfTI/...) is
 only touched once, on first import; every subsequent open reads from
 the catalog. This means:
 
-- Closing and reopening 3Photon preserves every label automatically.
+- Closing and reopening Lithium preserves every label automatically.
 - Moving or deleting the source file does not break the catalog entry.
 - Any future model can be trained directly off the catalog directory
   without an explicit ``EXPORT`` step (the catalog *is* the export).
 
 Layout (v2 — 1.1):
 
-    ~/.3photon/library/
+    ~/.lithium/library/
     ├── data/<file_key>.npz              coord + color + scalars (write-once on import)
     ├── labels/<namespace>/<file_key>.npy         int32 per-point labels
     ├── preview_labels/<namespace>/<file_key>.npy downsampled labels
@@ -67,7 +67,7 @@ _DATA_SUBDIR = "data"
 _LABELS_SUBDIR = "labels"
 _PREVIEWS_SUBDIR = "previews"
 _MESHES_SUBDIR = "meshes"   # Poisson-reconstructed surfaces, lazy-built
-_BACKUPS_SUBDIR = "backups"  # sibling of library/ — held under ~/.3photon/
+_BACKUPS_SUBDIR = "backups"  # sibling of library/ — held under ~/.lithium/
 
 
 def _data_dir() -> Path:
@@ -942,7 +942,7 @@ def is_source_stale(meta: dict, source_path: str | None) -> bool:
 
     Used by callers to warn the user (without auto-overwriting their
     labels) when the original PLY/LAS/NIfTI has been edited externally
-    since 3Photon last imported it.
+    since Lithium last imported it.
     """
     saved_mtime = meta.get("source_mtime") if meta else None
     if saved_mtime is None or not source_path:
@@ -1113,7 +1113,7 @@ def format_integrity_summary(status: dict) -> str:
 # ---------------------------------------------------------------------------
 
 def _backups_dir() -> Path:
-    """The sibling backups directory under ``~/.3photon/``."""
+    """The sibling backups directory under ``~/.lithium/``."""
     return Path(library_paths.library_dir()).parent / _BACKUPS_SUBDIR
 
 
@@ -1121,7 +1121,7 @@ def wipe_catalog(backup: bool = True) -> Path | None:
     """Erase the entire library catalog. Returns the backup tarball path.
 
     Layout after wipe:
-        ~/.3photon/library/
+        ~/.lithium/library/
         ├── data/         (empty)
         ├── labels/       (empty)
         └── previews/     (empty)
@@ -1131,7 +1131,7 @@ def wipe_catalog(backup: bool = True) -> Path | None:
     next session starts cleanly without needing to mkdir on first save.
 
     With ``backup=True`` (the default), a tar.gz of the entire library is
-    written to ``~/.3photon/backups/library_<unix_ts>.tar.gz`` BEFORE the
+    written to ``~/.lithium/backups/library_<unix_ts>.tar.gz`` BEFORE the
     wipe runs. The function refuses to wipe (returns None) if the backup
     step fails, so the user never loses data without a recovery path.
 

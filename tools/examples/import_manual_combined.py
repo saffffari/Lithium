@@ -1,4 +1,4 @@
-"""Import YOUR hand-labeled bones (dataset_32k scenes) into a 3Photon project with the
+"""Import YOUR hand-labeled bones (dataset_32k scenes) into a Lithium project with the
 COMBINED-pedicle + EXTENDED ontology, so you only add Spinous (and optionally Transverse).
 
 Source of truth: dataset_32k/<split>/scene_*/  (coord = stacker geometry, color, segment =
@@ -13,14 +13,14 @@ PLYs are written named to exports_32k_manual_combined/ (a reusable, correctly-la
 then imported. Additive + idempotent (content-hash; reuse project by name). NO model attached
 (these are already hand-labeled; ultramax's L/R pedicles wouldn't map to the merged class).
 
-Run (app closed): /run/media/alex/board_rack/3Photon/.venv/bin/python tools/import_manual_combined.py [--dry-run]
+Run (app closed): ~/Lithium/.venv/bin/python tools/import_manual_combined.py [--dry-run]
 """
 import sys, argparse, os, glob
 from pathlib import Path
 import numpy as np
 from plyfile import PlyData
 
-TP = Path("/run/media/alex/board_rack/3Photon")
+TP = Path.home() / "Lithium"
 sys.path.insert(0, str(TP))
 from src.data import library_paths
 from src.data.library_catalog import LibraryCatalog
@@ -28,9 +28,9 @@ from src.data.ply_loader import load_ply
 from src.data.cloud_store import save_cloud_data, save_cloud_labels
 from src.data.labels import LabelRegistry
 
-DS = TP / "dataset_32k"
-EXPORTS = "/run/media/alex/citadel/data/verse/exports_32k"
-OUTDIR = Path("/run/media/alex/citadel/data/verse/exports_32k_manual_combined")
+DS = Path("/board_rack/Lithium/datasets/dataset_32k")
+EXPORTS = "/citadel/data/verse/exports_32k"
+OUTDIR = Path("/citadel/data/verse/exports_32k_manual_combined")
 PROJECT_NAME = "verse_manual_combined"
 
 REMAP = np.array([0, 1, 2, 3, 3, 4], dtype=np.int32)  # hand {0..5} -> combined {0..4}
@@ -158,7 +158,7 @@ def main():
     for c in range(len(NAMES)):
         print(f"  {c}  {NAMES[c]:18} {hist[c]:>11,}  ({100 * hist[c] / tot:5.1f}%)")
     if not args.dry_run:
-        print(f"\nPLYs -> {OUTDIR}\nOpen 3Photon, pick '{PROJECT_NAME}', paint Spinous (5) [+ Transverse (6)].")
+        print(f"\nPLYs -> {OUTDIR}\nOpen Lithium, pick '{PROJECT_NAME}', paint Spinous (5) [+ Transverse (6)].")
 
 
 if __name__ == "__main__":

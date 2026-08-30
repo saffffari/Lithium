@@ -1,4 +1,4 @@
-# 3Photon: An End-to-End Desktop Platform for Point Cloud Annotation and Vision Model Training
+# Lithium: An End-to-End Desktop Platform for Point Cloud Annotation and Vision Model Training
 
 **Authors:** [TBD]
 **Affiliation:** [TBD]
@@ -6,7 +6,7 @@
 
 ## Abstract
 
-Point cloud semantic segmentation models such as PointNet++, Point Transformer, and PTv3 have achieved strong performance on benchmark datasets, but creating labeled training data for new domains remains a manual bottleneck. Existing annotation tools fall into two categories: cloud-based commercial platforms that prohibit use on sensitive data (medical imaging under IRB, proprietary industrial scans), and research prototypes with interfaces that present substantial learning barriers. We present 3Photon, a free desktop application that unifies the full workflow: import from point clouds (PLY, LAS/LAZ), medical volumes (TIF z-stacks), and time-series sequences; precise interactive selection via six complementary tools (pick, box, lasso, brush, polygon, curve) with depth limiting; hierarchical label layers; per-frame label propagation for 4D sequences; direct export to PTv3-compatible dataset formats; and in-app training via a sidecar subprocess architecture. The GPU-accelerated rendering supports millions of points at interactive frame rates, and all processing remains local to the user's machine. We demonstrate the tool on a representative spinal anatomy labeling task and report baseline segmentation metrics trained end-to-end from within the application.
+Point cloud semantic segmentation models such as PointNet++, Point Transformer, and PTv3 have achieved strong performance on benchmark datasets, but creating labeled training data for new domains remains a manual bottleneck. Existing annotation tools fall into two categories: cloud-based commercial platforms that prohibit use on sensitive data (medical imaging under IRB, proprietary industrial scans), and research prototypes with interfaces that present substantial learning barriers. We present Lithium, a free desktop application that unifies the full workflow: import from point clouds (PLY, LAS/LAZ), medical volumes (TIF z-stacks), and time-series sequences; precise interactive selection via six complementary tools (pick, box, lasso, brush, polygon, curve) with depth limiting; hierarchical label layers; per-frame label propagation for 4D sequences; direct export to PTv3-compatible dataset formats; and in-app training via a sidecar subprocess architecture. The GPU-accelerated rendering supports millions of points at interactive frame rates, and all processing remains local to the user's machine. We demonstrate the tool on a representative spinal anatomy labeling task and report baseline segmentation metrics trained end-to-end from within the application.
 
 ## 1. Introduction
 
@@ -19,7 +19,7 @@ The tooling for manual annotation has not kept pace with the models. Common work
 3. **Cloud platforms** (Segments.ai, Labelbox, Pointly) that are expensive, browser-based, and prohibit uploading sensitive data.
 4. **Custom one-off Python scripts** written per project.
 
-None of these tools cover the full workflow: import, annotate, export, train, iterate. Every lab reinvents the pipeline. This paper presents 3Photon, which fills this gap with a single desktop application.
+None of these tools cover the full workflow: import, annotate, export, train, iterate. Every lab reinvents the pipeline. This paper presents Lithium, which fills this gap with a single desktop application.
 
 ## 2. Related Work
 
@@ -27,7 +27,7 @@ None of these tools cover the full workflow: import, annotate, export, train, it
 
 - **ilastik** (Berg et al. 2019): the closest analogue in the voxel/image world. Interactive machine learning for biological image segmentation. We take inspiration from its interactive correction loop but apply it to point clouds.
 - **nnInteractive** (Isensee et al. 2024): similar for medical volumes, but voxel-based.
-- **Pointcept** (Wu et al. 2024): the framework for training PTv3 and related models. 3Photon exports directly to Pointcept's expected format.
+- **Pointcept** (Wu et al. 2024): the framework for training PTv3 and related models. Lithium exports directly to Pointcept's expected format.
 - **PPTK**: a viewer with lasso selection, last released in 2020.
 - **Segments.ai**: commercial cloud platform with model-assisted labeling.
 - **BasicAI / Kognic / Deepen**: commercial 3D annotation platforms focused on autonomous driving.
@@ -36,7 +36,7 @@ None of these tools cover the full workflow: import, annotate, export, train, it
 
 ### 3.1 Architecture Overview
 
-3Photon is implemented in Python 3.12 with ModernGL for rendering, GLFW for windowing, and Dear ImGui for GUI. The application is organized into three tabs (Figure 1):
+Lithium is implemented in Python 3.12 with ModernGL for rendering, GLFW for windowing, and Dear ImGui for GUI. The application is organized into three tabs (Figure 1):
 
 - **Contact Sheets**: gallery view showing all loaded clouds
 - **Light Table**: single-cloud annotation view
@@ -111,19 +111,19 @@ The sidecar pattern decouples training from the GUI: the renderer stays responsi
 
 ### 3.10 Design Philosophy
 
-3Photon deliberately rejects the utilitarian aesthetic of most research tools. The GUI follows an OP-1-inspired design language: ultra-dark neutral grey backgrounds, warm accent colors (coral, orange, amber, teal), custom-drawn widgets with font-metric based layout, and visible feedback for every action.
+Lithium deliberately rejects the utilitarian aesthetic of most research tools. The GUI follows an OP-1-inspired design language: ultra-dark neutral grey backgrounds, warm accent colors (coral, orange, amber, teal), custom-drawn widgets with font-metric based layout, and visible feedback for every action.
 
-This is not decoration. Research shows that tool aesthetics correlate with adoption (Nielsen 2000). A polished interface signals careful engineering and attracts users who would otherwise bounce off a dated-looking prototype. Design is a trust signal, and in 3Photon's case it is an honest one — the underlying engineering (GPU rendering, KD-tree acceleration, contiguous label remapping) is the reason the interface can afford to prioritize feel.
+This is not decoration. Research shows that tool aesthetics correlate with adoption (Nielsen 2000). A polished interface signals careful engineering and attracts users who would otherwise bounce off a dated-looking prototype. Design is a trust signal, and in Lithium's case it is an honest one — the underlying engineering (GPU rendering, KD-tree acceleration, contiguous label remapping) is the reason the interface can afford to prioritize feel.
 
 ## 4. Evaluation
 
 [TODO: User study and benchmark section]
 
-- **User study**: N annotators × M scenes × 3 tools (3Photon vs CloudCompare vs custom scripts). Metrics: time-to-label, mIoU of resulting labels vs ground truth.
-- **Benchmark**: export ScanNet and S3DIS via 3Photon, train PTv3, compare mIoU to published numbers.
+- **User study**: N annotators × M scenes × 3 tools (Lithium vs CloudCompare vs custom scripts). Metrics: time-to-label, mIoU of resulting labels vs ground truth.
+- **Benchmark**: export ScanNet and S3DIS via Lithium, train PTv3, compare mIoU to published numbers.
 - **Performance**: frame rates and interaction latencies on clouds of 100K, 1M, 10M points.
 
-Preliminary numbers from the 3Photon test suite on 1M-point synthetic clouds:
+Preliminary numbers from the Lithium test suite on 1M-point synthetic clouds:
 
 | Operation | Time |
 |-----------|------|
@@ -154,7 +154,7 @@ Preliminary numbers from the 3Photon test suite on 1M-point synthetic clouds:
 
 ## 7. Conclusion
 
-3Photon demonstrates that a modern, polished, offline desktop tool for the full point cloud annotation and training workflow is achievable in a modest codebase. We hope the combination of fast rendering, precise selection tools, and end-to-end integration lowers the barrier for researchers applying point cloud vision models to new domains — particularly those with data that cannot leave a local machine.
+Lithium demonstrates that a modern, polished, offline desktop tool for the full point cloud annotation and training workflow is achievable in a modest codebase. We hope the combination of fast rendering, precise selection tools, and end-to-end integration lowers the barrier for researchers applying point cloud vision models to new domains — particularly those with data that cannot leave a local machine.
 
 The codebase is released under [LICENSE] at [REPO URL].
 

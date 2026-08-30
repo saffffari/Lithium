@@ -3,7 +3,7 @@
 subjects at 32k density, build a dense training project with propagated
 labels, export as a PT-v3 dataset ready to train on.
 
-After this runs, you can launch training via the TRAIN tab in 3Photon
+After this runs, you can launch training via the TRAIN tab in Lithium
 or via the existing launch helpers. The dataset path will be printed
 at the end.
 
@@ -16,7 +16,7 @@ Steps:
   5. Propagate labels from spinelab_training_g1 (the most complete
      labeled set) via KD-tree nearest-neighbor.
   6. Export the dense project as a PT-v3 training dataset at
-     D:/3Photon/dataset_32k.
+     ~/Lithium/dataset_32k.
 """
 from __future__ import annotations
 
@@ -40,7 +40,7 @@ VERSE_ROOT = Path(r"E:/data/verse")
 EXPORTS_32K = VERSE_ROOT / "exports_32k"
 DENSE_PROJECT_NAME = "spinelab_training_dense"
 SOURCE_PROJECT_NAME = "spinelab_training_g1"  # most-complete labels live here
-DATASET_OUT_DIR = Path(r"D:/3Photon/dataset_32k")
+DATASET_OUT_DIR = Path(r"~/Lithium/dataset_32k")
 TARGET_POINTS = 32000
 
 SPLIT_DIRS = {
@@ -272,7 +272,7 @@ def main() -> int:
     print("=" * 70)
     print()
     print(f"Dataset: {DATASET_OUT_DIR}")
-    print(f"Active project: switch 3Photon to '{DENSE_PROJECT_NAME}' before launching")
+    print(f"Active project: switch Lithium to '{DENSE_PROJECT_NAME}' before launching")
     print()
     print("In TRAIN tab, set:")
     print("  Model name:     fight_club_ultramax")

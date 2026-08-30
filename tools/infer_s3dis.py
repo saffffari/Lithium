@@ -3,10 +3,10 @@
 
 Simpler than Pointcept's full TTA test pipeline — no augmentation ensemble,
 just one forward pass per voxelized room. Saves per-room predictions as .npy
-files that can be imported back into 3Photon.
+files that can be imported back into Lithium.
 
 Usage:
-    # From the 3photon-ptv3 conda env:
+    # From the lithium-ptv3 conda env:
     python tools/infer_s3dis.py \
         --checkpoint training/runs/s3dis_smoke_test/model/model_best.pth \
         --data-root data/s3dis-raw \

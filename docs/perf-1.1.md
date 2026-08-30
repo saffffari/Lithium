@@ -3,7 +3,7 @@
 Goal: handle clouds as big as this hardware allows (RTX 4090 24 GB,
 128 GB RAM, 24 cores, NVMe) while keeping annotation ergonomics.
 Proof point: the full 541-tile Palisades post-fire collection
-(~13–14 B points, 52 GB LAZ) at `/run/media/alex/citadel/data/
+(~13–14 B points, 52 GB LAZ) at `/citadel/data/
 los_angeles_points/palisades_postfire_C25/`.
 
 Validated by the wgpu spike (`prototypes/wgpu/`): 316 M points
@@ -84,5 +84,5 @@ Potree-style, but tile-grid based (matches how massive data arrives):
 4. c-store as an import option in the catalog; labels + picking; LOD
    export to training.
 
-Steps 1–2 prove the architecture on real data before any of 3Photon
+Steps 1–2 prove the architecture on real data before any of Lithium
 proper changes; 3–4 are the integration milestones.

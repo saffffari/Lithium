@@ -20,7 +20,7 @@ def _with_temp_library(func):
     """Run func with library_paths.library_dir() patched to a tempdir.
 
     Provides an isolated catalog root + a sibling backups dir so wipe
-    tests don't pollute the real ~/.3photon. Patches the canonical
+    tests don't pollute the real ~/.lithium. Patches the canonical
     library_paths.library_dir; cloud_store + catalog_lock + library_catalog
     all dispatch through there.
     """

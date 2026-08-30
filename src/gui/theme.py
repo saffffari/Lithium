@@ -1,4 +1,4 @@
-"""3Photon color palette and theme constants — OP-1 inspired, warm bias."""
+"""Lithium color palette and theme constants — OP-1 inspired, warm bias."""
 
 # Accent colors (saturated on dark background)
 CYAN = (0.0, 0.85, 0.85, 1.0)

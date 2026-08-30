@@ -1,4 +1,4 @@
-"""OP-1 inspired widget library for 3Photon.
+"""OP-1 inspired widget library for Lithium.
 
 All widgets follow the same visual language established by the RGB knob
 panel: dark rounded panels on OP-1 BG color, thin arc sweeps, tick marks,

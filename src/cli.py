@@ -1,4 +1,4 @@
-"""Headless CLI batch renderer for 3Photon.
+"""Headless CLI batch renderer for Lithium.
 
 Renders stills or spin animations from point cloud files without opening the GUI.
 Uses a hidden GLFW window to provide an OpenGL context for offscreen rendering.
@@ -46,7 +46,7 @@ class HeadlessRenderer:
         glfw.window_hint(glfw.OPENGL_FORWARD_COMPAT, True)
         glfw.window_hint(glfw.VISIBLE, False)
 
-        self._window = glfw.create_window(1, 1, "3Photon Headless", None, None)
+        self._window = glfw.create_window(1, 1, "Lithium Headless", None, None)
         if not self._window:
             glfw.terminate()
             raise RuntimeError("Failed to create hidden GLFW window")
@@ -217,8 +217,8 @@ def _collect_files(path: str) -> list[str]:
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog='3photon',
-        description='3Photon — Point Cloud Visualizer and Batch Renderer',
+        prog='lithium',
+        description='Lithium — Point Cloud Visualizer and Batch Renderer',
     )
     sub = parser.add_subparsers(dest='command')
 
@@ -275,7 +275,7 @@ def cli_main(argv: list[str] | None = None):
     renderer.init()
 
     t0 = time.time()
-    print(f"3Photon CLI — {args.command} | {len(files)} file(s) | {args.width}x{args.height} | camera={args.camera}")
+    print(f"Lithium CLI — {args.command} | {len(files)} file(s) | {args.width}x{args.height} | camera={args.camera}")
 
     opts = dict(
         width=args.width, height=args.height,

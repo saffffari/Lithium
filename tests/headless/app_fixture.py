@@ -1,4 +1,4 @@
-"""Tier-1 headless test fixture for 3Photon.
+"""Tier-1 headless test fixture for Lithium.
 
 A minimal stand-in for ``src.main.App`` exercising the catalog + label
 persistence code paths without the GLFW window, ImGui layer, or the

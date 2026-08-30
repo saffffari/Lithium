@@ -11,7 +11,7 @@ its predictions overwrite the manual labels in this namespace only.
 Run with Lithium CLOSED (the catalog lock must be free):
 
     .venv/bin/python tools/make_validation_project.py \\
-        --checkpoint /home/alex/3Photon_1.1/training/runs/sonata_full6_gold247_v1/model/model_best.pth \\
+        --checkpoint /home/alex/Lithium/training/runs/sonata_full6_gold247_v1/model/model_best.pth \\
         --name "Deepfield · Validation · Sonata (val 38)" --apply
 
 Without --apply it only audits. Idempotent: existing project / labels /
@@ -82,7 +82,7 @@ def main():
     from src.data.resampler import voxel_downsample  # noqa: F401  (import check)
     from scipy.spatial import cKDTree
 
-    library = Path(os.environ.get("THREEPHOTON_LIBRARY_DIR", str(Path.home() / ".3photon" / "library")))
+    library = Path(os.environ.get("LITHIUM_LIBRARY_DIR", str(Path.home() / ".lithium" / "library")))
     if a.apply:
         _assert_app_closed(library)          # audit is read-only and may run while Lithium is open
     catalog = LibraryCatalog()

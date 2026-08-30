@@ -117,7 +117,7 @@ def main():
     print(f"{len(tiles)} tiles, L0 {total_l0/1e9:.2f}B pts, "
           f"{n_levels} levels")
 
-    canvas = RenderCanvas(size=(1920, 1080), title="3Photon c-store demo")
+    canvas = RenderCanvas(size=(1920, 1080), title="Lithium c-store demo")
     adapter = wgpu.gpu.request_adapter_sync(power_preference="high-performance")
     device = adapter.request_device_sync(required_limits=adapter.limits)
     ctx = canvas.get_context("wgpu")
@@ -467,7 +467,7 @@ def main():
             state["frames"] = 0
             state["t_fps"] = now
             canvas.set_title(
-                f"3Photon c-store — {state['drawn']/1e6:.0f}M drawn / "
+                f"Lithium c-store — {state['drawn']/1e6:.0f}M drawn / "
                 f"{total_l0/1e9:.1f}B total — {state['fps']:.0f} fps — "
                 f"VRAM {state['vram']/1e9:.1f}G")
             print(f"fps {state['fps']:6.1f}  drawn {state['drawn']/1e6:7.1f}M"

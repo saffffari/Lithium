@@ -1,4 +1,4 @@
-"""Custom Pointcept dataset for 3Photon's exported directory layout.
+"""Custom Pointcept dataset for Lithium's exported directory layout.
 
 Pointcept's default datasets (ScanNetDataset, S3DISDataset, etc.) all
 assume their own specific preprocessing output. Rather than pretending
@@ -20,12 +20,12 @@ tree produced by ``src/export/dataset_export.py``:
 
 This file is imported ONLY by the training subprocess (the viz app's
 main venv has no torch / pointcept). At import time it registers
-``ThreePhotonDataset`` with Pointcept's ``DATASETS`` registry, so any
-generated config with ``type="ThreePhotonDataset"`` will instantiate
+``LithiumDataset`` with Pointcept's ``DATASETS`` registry, so any
+generated config with ``type="LithiumDataset"`` will instantiate
 it. Side-effect imports are the convention Pointcept uses throughout
 its own datasets.
 
-Not imported by 3Photon's viz code. Not covered by the main test
+Not imported by Lithium's viz code. Not covered by the main test
 suite (would require installing torch + pointcept in the main venv).
 Tested end-to-end once an actual training env exists.
 """
@@ -72,8 +72,8 @@ class RelabelSegment(object):
 
 
 @DATASETS.register_module()
-class ThreePhotonDataset(DefaultDataset):
-    """Reads 3Photon's per-scene directory layout.
+class LithiumDataset(DefaultDataset):
+    """Reads Lithium's per-scene directory layout.
 
     Each scene is a folder containing ``coord.npy`` / ``color.npy``
     / ``segment.npy`` and optionally ``normal.npy`` and ``feat.npy``.
@@ -82,7 +82,7 @@ class ThreePhotonDataset(DefaultDataset):
     feature that isn't listed in the generated config is never touched.
 
     ``ignore_index`` is configurable to match whatever was used at
-    export time — 3Photon writes 255 by default (see
+    export time — Lithium writes 255 by default (see
     ``src/export/dataset_export.py::IGNORE_INDEX``) but the dataset
     class doesn't hard-code it so an old export with a different
     convention still loads.
@@ -154,7 +154,7 @@ class ThreePhotonDataset(DefaultDataset):
         color_path = os.path.join(scene_dir, "color.npy")
         if os.path.isfile(color_path):
             color = np.load(color_path)
-            # 3Photon writes uint8 [0,255]. Pointcept's NormalizeColor
+            # Lithium writes uint8 [0,255]. Pointcept's NormalizeColor
             # transform expects float in that range, so pass through
             # as float32 — the scale happens inside Normalize.
             result["color"] = np.ascontiguousarray(color, dtype=np.float32)

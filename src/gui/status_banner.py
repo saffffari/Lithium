@@ -1,6 +1,6 @@
 """Sticky status banner for save/load errors and recovery hints.
 
-The packaged 3Photon .exe has no stdout — every ``print()`` on failure
+The packaged Lithium .exe has no stdout — every ``print()`` on failure
 is invisible to the user. This module gives App a single place to
 surface critical messages (label save failed, project lock denied,
 catalog corruption recovered, etc.) as a dismissible sticky bar at the

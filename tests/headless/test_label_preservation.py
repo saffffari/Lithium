@@ -2,7 +2,7 @@
 
 Each test pins down one slice of the label-safety contract. New
 regression tests land here as Phase 9 / Phase 10 fixes ship — keep this
-file the single source of truth for what 3Photon promises about label
+file the single source of truth for what Lithium promises about label
 state across sessions, project switches, and overwrites.
 """
 

@@ -1,12 +1,12 @@
-# 3Photon User Guide
+# Lithium User Guide
 
-3Photon is a desktop workstation for point-cloud annotation and vision-model training — all local, no cloud upload. Build labeled datasets, then train Pointcept PT-v3 on them.
+Lithium is a desktop workstation for point-cloud annotation and vision-model training — all local, no cloud upload. Build labeled datasets, then train Pointcept PT-v3 on them.
 
 ## Installation
 
 ```bash
-git clone <repo-url> 3photon
-cd 3photon
+git clone <repo-url> lithium
+cd lithium
 python -m venv .venv
 source .venv/bin/activate         # Linux / macOS
 # .venv/Scripts/activate          # Windows
@@ -27,7 +27,7 @@ python -m src.cli render scene.ply out.png            # headless render
 python -m src.cli spin scene.ply ./spin --frames 60   # spin sequence
 ```
 
-A single-instance lock lives at `~/.3photon/library/.lock` — 3Photon refuses to start if another live instance owns it. Override the library dir with `THREEPHOTON_LIBRARY_DIR`.
+A single-instance lock lives at `~/.lithium/library/.lock` — Lithium refuses to start if another live instance owns it. Override the library dir with `LITHIUM_LIBRARY_DIR`.
 
 ## The Three Modes
 
@@ -62,7 +62,7 @@ Drag-and-drop files or folders onto the window, or use the IMPORT buttons.
 7. **Toggle LABELS ON** to see color-coded result
 8. **Export** the labeled dataset via AUTOMATION tab → `export-dataset`
 
-Labels persist immediately to `~/.3photon/library/labels/<file_key>.npy`. There is no separate "save" step — the catalog *is* the dataset.
+Labels persist immediately to `~/.lithium/library/labels/<file_key>.npy`. There is no separate "save" step — the catalog *is* the dataset.
 
 ### Selection tools
 
@@ -113,7 +113,7 @@ train-status
 train-stop
 ```
 
-Training runs in a sidecar Pointcept subprocess in the `3photon-ptv3` conda env (separate from the renderer). See [training_setup.md](training_setup.md) for env install.
+Training runs in a sidecar Pointcept subprocess in the `lithium-ptv3` conda env (separate from the renderer). See [training_setup.md](training_setup.md) for env install.
 
 ---
 

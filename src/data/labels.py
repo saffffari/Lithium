@@ -75,7 +75,7 @@ class LabelRegistry:
         self._next_id: int = 1
         self._palette_index: int = 0
         # Optional mutation-notify hook. The app installs this to
-        # auto-persist the taxonomy to ~/.3photon/schema.json on every
+        # auto-persist the taxonomy to ~/.lithium/schema.json on every
         # add/remove/rename/recolor/visibility/lock change. Default is
         # a no-op so the class stays self-contained for tests and tools
         # that don't care about persistence.

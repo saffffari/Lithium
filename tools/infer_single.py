@@ -4,10 +4,10 @@
 Reads a single point cloud from a temp ``.npz`` (coord, color, normal),
 runs one forward pass through the trained checkpoint, writes per-point
 class predictions to a ``.npy`` file. Intended to be spawned from the
-3Photon GUI's "Predict Current Cloud" command — fast, no dataset
+Lithium GUI's "Predict Current Cloud" command — fast, no dataset
 directory dance.
 
-Usage (run from inside the 3photon-ptv3 conda env):
+Usage (run from inside the lithium-ptv3 conda env):
 
     python tools/infer_single.py \\
         --checkpoint <model_best.pth> \\
@@ -91,7 +91,7 @@ def build_inference_pipeline(cfg):
     rescale, CenterShift, NormalizeColor, ...) runs exactly as in
     training so the model sees the distribution it was trained on."""
     from pointcept.datasets.transform import TRANSFORMS
-    import three_photon_dataset  # noqa: F401  registers RelabelSegment etc.
+    import lithium_dataset  # noqa: F401  registers RelabelSegment etc.
     steps, feat_keys = [], ("coord", "color", "normal")
     for t in cfg.data.val.transform:
         t = dict(t)
@@ -155,7 +155,7 @@ def build_model(checkpoint_path: str, num_classes: int | None = None):
     is the only value ``load_state_dict(strict=True)`` will accept. If
     the caller's hint disagrees we emit a one-line warning and use the
     checkpoint's value anyway. This makes the script robust against the
-    caller (the 3Photon GUI) computing num_classes from a stale project
+    caller (the Lithium GUI) computing num_classes from a stale project
     registry or a different project's ontology — a foot-gun that caused
     repeated load_state_dict mismatches in the Contact Sheets RUN
     INFERENCE flow.

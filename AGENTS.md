@@ -10,14 +10,14 @@ without preamble.
 > The clinical product surface (**SpineLab** — IMAGING / HOLOGRAM /
 > OVERWATCH, CT ingest, PolyPose registration, clinical measurement
 > analytics) was split out into its own repository. This repo is
-> 3Photon only. Don't reintroduce imaging / registration / clinical
+> Lithium only. Don't reintroduce imaging / registration / clinical
 > code here.
 
 ---
 
 ## Project shape
 
-3Photon is a single-process desktop point-cloud workstation with three
+Lithium is a single-process desktop point-cloud workstation with three
 modes sharing one `App` god-object (`src/main.py`):
 
 | Mode | Key | Purpose |
@@ -44,7 +44,7 @@ Don't duplicate their contents in new docs; link to them.
   the catalog *is* the dataset. `library_catalog` owns entries /
   projects / previews / mesh-build queue; `cloud_store` is the
   write-once on-disk store (data / labels / meshes NPZ under
-  `~/.3photon/library/`). Both are shared infrastructure — do not
+  `~/.lithium/library/`). Both are shared infrastructure — do not
   treat as removable.
 - **`src/core/measure_registry.py`** — `Anchor(cloud_key, local_pos)`
   + the measurement registry. Anchors are cloud-local.
@@ -75,7 +75,7 @@ Don't duplicate their contents in new docs; link to them.
 - Mesh builds queue through `catalog.queue_mesh_build`; results arrive
   via `poll_pending_meshes` in the main loop.
 - PT-v3 training/inference runs as a subprocess (Pointcept, conda env
-  `3photon-ptv3`) following the PointceptRunner template: Popen +
+  `lithium-ptv3`) following the PointceptRunner template: Popen +
   daemon reader thread + status state machine + `PYTHONIOENCODING=utf-8`.
 - **Subprocess reader threads must NOT mutate `App.*` directly** — they
   push events into a main-thread-drained deque (the Pattern-A queue).

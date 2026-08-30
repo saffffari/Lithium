@@ -25,7 +25,7 @@ python -m src.main              & rem app boots to SHEETS
       `_on_content_scale` → `ImGuiLayer.rebuild_for_scale`). GLFW on
       Windows fires content-scale changes on monitor move — confirm.
 - [ ] **Import** — PLY + LAS via File menu (tkinter dialogs) and
-      drag-drop; catalog write to `%USERPROFILE%\.3photon\library`.
+      drag-drop; catalog write to `%USERPROFILE%\.lithium\library`.
 - [ ] **Label paint + restart** — paint, quit, relaunch, labels
       persist (atomic os.replace path on NTFS).
 - [ ] **v2 label migration** — if this machine has a 1.0 library,
@@ -39,7 +39,7 @@ python -m src.main              & rem app boots to SHEETS
       peft + wandb now required, `amp_dtype=bfloat16` default,
       `tools/train_until_done.sh` is bash-only (use WSL or run
       launch_training.py directly; a .ps1 port is welcome).
-      Set `THREEPHOTON_TRAIN_PYTHON` instead of --python-exe.
+      Set `LITHIUM_TRAIN_PYTHON` instead of --python-exe.
 - [ ] **CLI render** — `python -m src.main render <ply> --output out\`.
 
 Known Windows-specific code paths to eyeball if something breaks:

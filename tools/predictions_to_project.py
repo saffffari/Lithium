@@ -19,7 +19,7 @@ This tool:
      and ``library/preview_labels/<file_key>.npy`` (preview-res, via
      a second NN pass against the cached preview .npz).
 
-After running, relaunch 3Photon: the matched test clouds will show the
+After running, relaunch Lithium: the matched test clouds will show the
 model's predictions as labels in the same orange/blue palette your hand
 labels use. Backups of the previous (hand-labelled) catalog labels can
 be restored from ``library/backups/<timestamp>/`` if needed.
@@ -48,7 +48,7 @@ for _s in (sys.stdout, sys.stderr):
 
 
 def library_dir() -> Path:
-    return Path(os.path.expanduser("~")) / ".3photon" / "library"
+    return Path(os.path.expanduser("~")) / ".lithium" / "library"
 
 
 def load_project(project_id: str) -> dict:
@@ -303,7 +303,7 @@ def main():
         written += 1
 
     print(f"\nWrote labels for {written} cloud(s) into the catalog.")
-    print("Reopen 3Photon to see them; existing hand labels are in "
+    print("Reopen Lithium to see them; existing hand labels are in "
           f"{library_dir() / 'backups'}.")
 
 

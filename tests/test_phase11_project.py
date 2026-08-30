@@ -179,7 +179,7 @@ def test_relative_path_fallback():
             'relative_path': '../cloud.ply',
         }
         # Create a project dir with a sibling cloud file
-        project_dir = os.path.join(tmp, 'proj.3photon')
+        project_dir = os.path.join(tmp, 'proj.lithium')
         os.makedirs(project_dir)
         cloud_path = os.path.join(tmp, 'cloud.ply')
         open(cloud_path, 'w').close()

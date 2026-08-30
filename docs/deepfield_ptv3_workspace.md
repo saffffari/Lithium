@@ -57,7 +57,7 @@ Audit only:
 .venv/bin/python tools/migrate_deepfield_ptv3_workspace.py
 ```
 
-Apply after reviewing the audit and closing 3Photon:
+Apply after reviewing the audit and closing Lithium:
 
 ```bash
 .venv/bin/python tools/migrate_deepfield_ptv3_workspace.py --apply
