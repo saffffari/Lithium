@@ -1551,8 +1551,9 @@ def _draw_labels_section(app, child_id: str = "##labels") -> bool:
         # 10 lines; a dragged height pins it, double-click on the handle
         # goes back to auto.
         _content_h = float(getattr(app, '_labels_content_h', 0.0) or 0.0)
-        _auto_h = min(th * 10, max(th * 3.0, _content_h + th * 0.35)) if _content_h > 0 else th * 10
-        label_max_h = stored if stored > 0 else _auto_h
+        _cap = stored if stored > 0 else th * 10   # a dragged height only caps
+        label_max_h = (min(_cap, max(th * 3.0, _content_h + th * 0.35))
+                       if _content_h > 0 else _cap)
         min_h = th * 3.0
         max_h = th * 40.0
 
