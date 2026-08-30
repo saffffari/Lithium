@@ -4259,12 +4259,12 @@ def _draw_inference_model_picker(app) -> None:
 
     # Build dropdown items. First entry is "(auto)" — explicit way to
     # clear an override without having to know which model would win.
-    items = ["(auto — highest mIoU)"]
+    items = ["(auto: highest mIoU)"]
     item_model_ids: list[str | None] = [None]
     for m in eligibles:
-        miou_str = f" — mIoU {m.best_miou:.2f}" if m.best_miou > 0 else ""
+        miou_str = f"  mIoU {m.best_miou:.2f}" if m.best_miou > 0 else ""
         cls_str = f" · {m.num_classes}cls" if m.num_classes else ""
-        src_str = (f" · from {m._source_project}"
+        src_str = (f"  from {m._source_project}"
                    if getattr(m, '_source_project', '') else "")
         items.append(f"{m.name}{miou_str}{cls_str}{src_str}")
         item_model_ids.append(m.model_id)
@@ -4298,7 +4298,7 @@ def _draw_inference_model_picker(app) -> None:
     chosen = _resolve_inference_model(app, project_id)
     if chosen is not None and chosen.best_checkpoint:
         ckpt_name = os.path.basename(chosen.best_checkpoint)
-        imgui.text_colored(f"  → {ckpt_name}", *OP1_GRAY[:3])
+        imgui.text_colored(f"  -> {ckpt_name}", *OP1_GRAY[:3])
 
 
 def _resolve_inference_checkpoint(app) -> str | None:

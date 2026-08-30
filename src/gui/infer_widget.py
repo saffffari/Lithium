@@ -319,13 +319,13 @@ def draw_light_table_infer(app, *, start_infer, model_label: str | None,
         dl.add_rect_filled(wx + s(6), bar_y, wx + w - s(6), bar_y + s(2),
                            col32(OP1_GREEN))
         npts = con["point_count"] if con else 0
-        status = f"COMPLETE — {npts:,} pts labeled  (Ctrl+Z undoes)"
+        status = f"COMPLETE - {npts:,} pts labeled  (Ctrl+Z undoes)"
         status_col = OP1_GREEN
     elif state == "failed":
-        status = "FAILED — see LOG on the TRAIN tab"
+        status = "FAILED - see LOG on the TRAIN tab"
         status_col = OP1_RED
     elif not can_run:
-        status = "no trained model — TRAIN one first"
+        status = "no trained model - TRAIN one first"
         status_col = OP1_DIM
     elif entry is None:
         status = "select a cloud"
