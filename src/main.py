@@ -7388,7 +7388,19 @@ def main():
 
     sys.argv = _parse_startup_flags(sys.argv)
     app = App()
-    app.run()
+    # LITHIUM_EXIT_AFTER=<s>: close the window cleanly after N seconds;
+    # LITHIUM_PROFILE=<file>: run the loop under cProfile and dump stats
+    # there on exit. Both exist so a machine we cannot watch can be measured.
+    _exit_after = float(os.environ.get("LITHIUM_EXIT_AFTER", "0") or 0)
+    if _exit_after > 0:
+        import threading
+        threading.Timer(_exit_after, lambda: glfw.set_window_should_close(app.window, True)).start()
+    _prof = os.environ.get("LITHIUM_PROFILE", "")
+    if _prof:
+        import cProfile
+        cProfile.runctx("app.run()", globals(), {"app": app}, filename=_prof)
+    else:
+        app.run()
 
 
 if __name__ == '__main__':
