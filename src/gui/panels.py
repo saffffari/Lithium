@@ -196,6 +196,19 @@ def draw_main_menu_bar(app) -> float:
             mp_enabled = mp_open or bool(getattr(app, 'measure_registry', None) and app.measure_registry.items)
             if imgui.menu_item("Measurements", "M", mp_open, mp_enabled)[0]:
                 app.measure_panel_open = not mp_open
+            if imgui.begin_menu("Mouse", True):
+                from src.utils.prefs import update_prefs
+                if imgui.menu_item("Thumb wheel changes cloud", "",
+                                   app.thumb_wheel_navigation, True)[0]:
+                    app.thumb_wheel_navigation = not app.thumb_wheel_navigation
+                    app._cloud_wheel.reset()
+                    update_prefs({'thumb_wheel_navigation': app.thumb_wheel_navigation})
+                if imgui.menu_item("Reverse thumb wheel", "",
+                                   app.thumb_wheel_reverse, True)[0]:
+                    app.thumb_wheel_reverse = not app.thumb_wheel_reverse
+                    app._cloud_wheel.reset()
+                    update_prefs({'thumb_wheel_reverse': app.thumb_wheel_reverse})
+                imgui.end_menu()
             imgui.separator()
             if imgui.menu_item("Top",   "T", False, True)[0]:
                 app.camera.set_preset('top')

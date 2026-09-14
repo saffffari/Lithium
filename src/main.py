@@ -32,6 +32,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.core.camera import Camera
 from src.core.input_state import ClickDetector
+from src.core.cloud_wheel import CloudWheel
 from src.core.undo import UndoStack, apply_label
 from src.core.selection import SelectionBuffer
 from src.core.tools.pick_tool import (
@@ -568,6 +569,9 @@ class App:
         self.performance_preference = str(prefs.get('performance_profile', 'auto'))
         from src.core.resource_budget import LEAN
         self.resource_budget = LEAN
+        self._cloud_wheel = CloudWheel()
+        self.thumb_wheel_navigation = bool(prefs.get('thumb_wheel_navigation', True))
+        self.thumb_wheel_reverse = bool(prefs.get('thumb_wheel_reverse', False))
         self.gallery_cell_size: int = int(prefs.get("gallery_cell_size", 220))
         # Labels panel height (draggable resize handle in sidebar)
         self._labels_list_h: float = float(prefs.get("labels_list_h", 0.0))
@@ -7084,6 +7088,29 @@ class App:
     def _on_scroll(self, window, x_offset, y_offset):
         self.gui.feed_scroll(y_offset)
         if self.gui.wants_mouse():
+            self._cloud_wheel.reset()
+            return
+
+        # The thumb wheel has its own axis. Reuse normal cloud selection
+        # so project filtering, label persistence and camera state agree
+        # with the arrow keys. Never switch a cloud during a paint/drag.
+        if x_offset and abs(x_offset) >= abs(y_offset):
+            dragging = (self._lmb_held or self._rmb_held or self._mmb_held
+                        or self._radial_menu_active
+                        or self._gallery_scrollbar_dragging)
+            if (self.thumb_wheel_navigation and not dragging
+                    and self.mode in (MODE_LIGHT_TABLE, MODE_CONTACT_SHEETS)):
+                offset = -x_offset if self.thumb_wheel_reverse else x_offset
+                step = self._cloud_wheel.step(float(offset))
+                if step:
+                    if self.sequence is not None:
+                        self._seek_sequence(self.sequence.current_index + step)
+                    else:
+                        self._navigate_cloud(step)
+            else:
+                self._cloud_wheel.reset()
+            return
+        if not y_offset:
             return
 
         ctrl = (glfw.get_key(window, glfw.KEY_LEFT_CONTROL) == glfw.PRESS or
