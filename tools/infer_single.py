@@ -24,6 +24,7 @@ hardcoded PT-v3m1 path is used unchanged.
 """
 
 import argparse
+import hashlib
 import json
 import os
 import sys
@@ -37,6 +38,8 @@ POINTCEPT_DIR = str(Path(__file__).resolve().parent.parent / "training" / "point
 EXT_DIR = str(Path(__file__).resolve().parent.parent / "src" / "training" / "pointcept_ext")
 sys.path.insert(0, POINTCEPT_DIR)
 sys.path.insert(0, EXT_DIR)
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from src.training.inference_contract import FragmentLogitAccumulator
 
 for _s in (sys.stdout, sys.stderr):
     if hasattr(_s, "reconfigure"):
@@ -110,7 +113,31 @@ def build_inference_pipeline(cfg):
 
 
 @torch.no_grad()
-def predict_with_pipeline(model, steps, feat_keys, coord, color, normal) -> np.ndarray:
+def _predict_fragments(model, fragments, n_points, feat_keys, audit=None):
+    accumulator = FragmentLogitAccumulator(n_points)
+    for frag in fragments:
+        feat = np.concatenate([frag[k] for k in feat_keys], axis=1).astype(np.float32)
+        inp = dict(
+            coord=torch.from_numpy(np.ascontiguousarray(frag["coord"])).float().cuda(),
+            grid_coord=torch.from_numpy(np.ascontiguousarray(frag["grid_coord"])).int().cuda(),
+            feat=torch.from_numpy(feat).float().cuda(),
+            offset=torch.tensor([len(frag["coord"])], dtype=torch.long, device="cuda"),
+        )
+        output = model(inp)
+        logits = output["seg_logits"].float().cpu().numpy()
+        accumulator.add(frag["index"], logits)
+        del inp, output, logits
+        torch.cuda.empty_cache()
+    pred = accumulator.finish()  # No label output is published on incomplete coverage.
+    if audit is not None:
+        audit.update(accumulator.summary())
+    print(f"[infer_single] {accumulator.fragment_count} fragments; "
+          f"all {n_points:,} points covered; mean raw logits", flush=True)
+    return pred
+
+
+@torch.no_grad()
+def predict_with_pipeline(model, steps, feat_keys, coord, color, normal, audit=None) -> np.ndarray:
     n_points = len(coord)
     color = color.astype(np.float32)
     if color.max() <= 1.0:
@@ -119,31 +146,10 @@ def predict_with_pipeline(model, steps, feat_keys, coord, color, normal) -> np.n
               else normal.astype(np.float32))
     data = dict(coord=coord.astype(np.float32), color=color, normal=normal)
     for step in steps:
-        data = step(data)
+        # A test-mode GridSample produces fragments; later transforms apply to each.
+        data = [step(fragment) for fragment in data] if isinstance(data, list) else step(data)
     fragments = [data] if isinstance(data, dict) else list(data)
-    pred = np.zeros(n_points, dtype=np.int32)
-    covered = np.zeros(n_points, dtype=bool)
-    for frag in fragments:
-        feat = np.concatenate([frag[k] for k in feat_keys], axis=1).astype(np.float32)
-        offset = np.array([len(frag["coord"])], dtype=np.int64)
-        inp = dict(
-            coord=torch.from_numpy(np.ascontiguousarray(frag["coord"])).float().cuda(),
-            grid_coord=torch.from_numpy(np.ascontiguousarray(frag["grid_coord"])).int().cuda(),
-            feat=torch.from_numpy(feat).float().cuda(),
-            offset=torch.from_numpy(offset).long().cuda(),
-        )
-        output = model(inp)
-        pred_vox = output["seg_logits"].argmax(dim=1).cpu().numpy().astype(np.int32)
-        del inp, output
-        torch.cuda.empty_cache()
-        idx = frag["index"]
-        pred[idx] = pred_vox
-        covered[idx] = True
-    uncovered = int((~covered).sum())
-    if uncovered:
-        print(f"[infer_single] warning: {uncovered:,} of {n_points:,} points not "
-              f"covered by any fragment; left as class 0", flush=True)
-    return pred
+    return _predict_fragments(model, fragments, n_points, feat_keys, audit)
 
 
 def build_model(checkpoint_path: str, num_classes: int | None = None):
@@ -209,7 +215,7 @@ def build_model(checkpoint_path: str, num_classes: int | None = None):
 
 
 @torch.no_grad()
-def predict(model, coord, color, normal, grid_size: float) -> np.ndarray:
+def predict(model, coord, color, normal, grid_size: float, audit=None) -> np.ndarray:
     from pointcept.datasets.transform import GridSample
 
     n_points = len(coord)
@@ -235,32 +241,16 @@ def predict(model, coord, color, normal, grid_size: float) -> np.ndarray:
               f"merging predictions so no points are silently left at "
               f"class 0.", flush=True)
 
-    pred = np.zeros(n_points, dtype=np.int32)
-    covered = np.zeros(n_points, dtype=bool)
-    for frag in fragments:
-        feat = np.concatenate(
-            [frag["coord"], frag["color"], frag["normal"]], axis=1)
-        offset = np.array([len(frag["coord"])], dtype=np.int64)
-        inp = dict(
-            coord=torch.from_numpy(frag["coord"]).float().cuda(),
-            grid_coord=torch.from_numpy(frag["grid_coord"]).int().cuda(),
-            feat=torch.from_numpy(feat).float().cuda(),
-            offset=torch.from_numpy(offset).long().cuda(),
-        )
-        output = model(inp)
-        pred_vox = output["seg_logits"].argmax(dim=1).cpu().numpy().astype(np.int32)
-        del inp, output
-        torch.cuda.empty_cache()
-        idx = frag["index"]
-        pred[idx] = pred_vox
-        covered[idx] = True
+    return _predict_fragments(model, fragments, n_points,
+                              ("coord", "color", "normal"), audit)
 
-    uncovered = int((~covered).sum())
-    if uncovered:
-        print(f"[infer_single] warning: {uncovered:,} of {n_points:,} "
-              f"points were not covered by any fragment; left as class 0",
-              flush=True)
-    return pred
+
+def _file_sha256(path):
+    digest = hashlib.sha256()
+    with open(path, "rb") as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
 
 
 def main():
@@ -278,6 +268,7 @@ def main():
                          "config.py next to the checkpoint's run dir)")
     ap.add_argument("--legacy", action="store_true",
                     help="force the hardcoded PT-v3m1 path even if a config exists")
+    ap.add_argument("--report", help="optional JSON execution/coverage report")
     args = ap.parse_args()
 
     z = np.load(args.input)
@@ -287,6 +278,7 @@ def main():
 
     config_path = None if args.legacy else (args.config or find_run_config(args.checkpoint))
     print(f"[infer_single] loading {args.checkpoint}", flush=True)
+    audit = {}
     t0 = time.time()
     if config_path:
         print(f"[infer_single] run config: {config_path}", flush=True)
@@ -297,19 +289,32 @@ def main():
               f"pipeline: {', '.join(type(s).__name__ for s in steps)})", flush=True)
         print(f"[infer_single] input: {len(coord):,} points", flush=True)
         t1 = time.time()
-        pred = predict_with_pipeline(model, steps, feat_keys, coord, color, normal)
+        pred = predict_with_pipeline(model, steps, feat_keys, coord, color, normal, audit)
     else:
         model = build_model(args.checkpoint, args.num_classes)
         print(f"[infer_single] model loaded in {time.time()-t0:.1f}s (legacy PT-v3m1 path)", flush=True)
         print(f"[infer_single] input: {len(coord):,} points", flush=True)
         t1 = time.time()
-        pred = predict(model, coord, color, normal, args.grid_size)
-    print(f"[infer_single] inference {time.time()-t1:.2f}s", flush=True)
+        pred = predict(model, coord, color, normal, args.grid_size, audit)
+    inference_seconds = time.time() - t1
+    print(f"[infer_single] inference {inference_seconds:.2f}s", flush=True)
 
     np.save(args.output, pred)
     unique, counts = np.unique(pred, return_counts=True)
     summary = ", ".join(f"{int(u)}={int(c)}" for u, c in zip(unique, counts))
     print(f"[infer_single] wrote {args.output}  classes: {summary}", flush=True)
+    if args.report:
+        report = dict(schema="lithium.single-cloud-inference.v1", **audit,
+                      config_path=config_path,
+                      config_sha256=_file_sha256(config_path) if config_path else None,
+                      checkpoint_sha256=_file_sha256(args.checkpoint),
+                      input_sha256=_file_sha256(args.input), output_sha256=_file_sha256(args.output),
+                      model_path="registered_or_discovered_config" if config_path else "legacy_ptv3m1",
+                      inference_seconds=inference_seconds,
+                      peak_cuda_allocated_bytes=torch.cuda.max_memory_allocated(),
+                      peak_cuda_reserved_bytes=torch.cuda.max_memory_reserved(),
+                      class_counts={str(int(u)): int(c) for u, c in zip(unique, counts)})
+        Path(args.report).write_text(json.dumps(report, indent=2) + "\n")
 
 
 if __name__ == "__main__":

@@ -73,3 +73,40 @@ def test_sandbox_lists_every_model_with_a_checkpoint(world):
     assert sorted(x.name for x in got) == ["alien", "compat", "own"]
     assert {x._source_project for x in got} == {"spine", "other"}
     assert panels._model_class_names(m["alien"]) == ["Unlabeled", "Transverse_Process"]
+
+
+def test_cross_project_inference_uses_exact_registered_config(world, tmp_path):
+    app, _, _, models = world
+    model = models["compat"]
+    config = tmp_path / "recovered" / "source_config.py"
+    config.parent.mkdir()
+    config.write_text("model = dict(type='example')\n")
+    model.config_snapshot = {"source_config": str(config)}
+    assert panels._resolve_inference_config(app, model.best_checkpoint) == str(config)
+    config.unlink()
+    with pytest.raises(FileNotFoundError, match="Registered model configuration"):
+        panels._resolve_inference_config(app, model.best_checkpoint)
+
+
+def test_predict_subprocess_receives_bound_config_before_any_label_write(world, tmp_path, monkeypatch):
+    import subprocess
+    app, project, _, models = world
+    model = models["compat"]
+    config = tmp_path / "exact.py"
+    config.write_text("model = dict(type='example')\n")
+    model.config_snapshot = {"source_config": str(config)}
+    coord = np.zeros((4, 3), dtype=np.float32)
+    cloud = types.SimpleNamespace(positions=coord, colors=coord, scalars={"normal": coord}, point_count=4)
+    entry = types.SimpleNamespace(full_gpu=types.SimpleNamespace(cloud_data=cloud), name="fixture")
+    commands = []
+    def capture(cmd, **kwargs):
+        commands.append(cmd)
+        return types.SimpleNamespace(returncode=1, stdout="intentional stop", stderr="")
+    monkeypatch.setattr(subprocess, "run", capture)
+    def no_save(*args, **kwargs):
+        pytest.fail("Failed subprocess must not save labels")
+    monkeypatch.setattr(cloud_store, "save_cloud_labels", no_save)
+    assert panels._predict_cloud(app, entry, checkpoint=model.best_checkpoint,
+        python_exe="unused", class_names=["Unlabeled", "Pedicle"],
+        cls_to_rid=np.array([0, 3]), label_namespace=project.id) is None
+    assert commands[0][-2:] == ["--config", str(config)]

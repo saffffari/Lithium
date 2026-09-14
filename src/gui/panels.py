@@ -4519,6 +4519,27 @@ def _resolve_inference_class_map(
     return classes_name_order, cls_to_rid
 
 
+def _resolve_inference_config(app, checkpoint_path: str) -> str | None:
+    """Use the selected model's exact imported config, including cross-project models."""
+    from src.training.inference_contract import registered_config_path
+    registry = getattr(app, "_train_model_registry", None)
+    if registry is None:
+        return None
+    project_id = _resolve_active_project_id(app)
+    catalog = getattr(app, "catalog", None)
+    pids = [project_id] if project_id else []
+    if catalog is not None:
+        pids += [pid for pid in catalog.projects if pid not in pids]
+    checkpoint = os.path.realpath(checkpoint_path)
+    for _pid, model in registry.all_models(pids):
+        if any(path and os.path.realpath(path) == checkpoint
+               for path in (model.best_checkpoint, model.last_checkpoint)):
+            config = registered_config_path(model)
+            if config:
+                return config
+    return None
+
+
 def _predict_cloud(
     app, entry, *, checkpoint: str, python_exe: str,
     class_names: list[str], cls_to_rid,
@@ -4627,6 +4648,9 @@ def _predict_cloud(
                "--grid-size", "0.5"]
 
         try:
+            config_path = _resolve_inference_config(app, checkpoint)
+            if config_path:
+                cmd += ["--config", config_path]
             # encoding="utf-8" + errors="replace" so a Unicode glyph in
             # the inference subprocess's stdout (tqdm / logging) doesn't
             # raise UnicodeDecodeError on the captured output — same fix
