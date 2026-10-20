@@ -12,6 +12,7 @@ from src.core.modes import (
 )
 from src.gui.theme import *
 from src.gui.scale import sidebar_width, s
+from src.gui import bundle_dialog
 from src.gui.widgets import (
     draw_camera_cube, draw_resample_control, draw_op1_color_knobs,
     draw_op1_knob_row,
@@ -121,6 +122,12 @@ def draw_main_menu_bar(app) -> float:
                 app.import_file_dialog()
             if imgui.menu_item("Import Folder...", "", False, True)[0]:
                 app.import_folder_dialog()
+            imgui.separator()
+            has_cat = getattr(app, 'catalog', None) is not None
+            if imgui.menu_item("Import Project (.li)...", "", False, has_cat)[0]:
+                bundle_dialog.request_import(app)
+            if imgui.menu_item("Export Project (.li)...", "", False, has_cat)[0]:
+                bundle_dialog.request_export(app)
             imgui.separator()
             if imgui.menu_item("Save Points", "", False, True)[0]:
                 _do_save_points(app)
@@ -280,6 +287,7 @@ def draw_settings_panel(app) -> bool:
     # level so the popups aren't clipped by the sidebar child windows.
     _draw_gallery_ctx_popup(app)
     _draw_gallery_rename_modal(app)
+    bundle_dialog.draw_bundle_modals(app)
 
     return changed
 

@@ -91,6 +91,7 @@ from src.gui.status_banner import draw_status_banner
 from src.gui.measure_panel import draw_measure_panel
 from src.gui.timeline import draw_timeline
 from src.gui.shortcuts_panel import draw_shortcuts_overlay
+from src.gui.bundle_dialog import draw_bundle_overlay
 from src.gui.radial_menu import draw_radial_menu
 from src.gui.label_panel import draw_color_picker_popup
 from src.gui import gallery_layout
@@ -2756,6 +2757,9 @@ class App:
         # Shortcuts overlay
         if self.show_shortcuts:
             draw_shortcuts_overlay(self)
+
+        # .li export / import progress card (no-op when idle)
+        draw_bundle_overlay(self)
 
         # Radial preset menu overlay (RMB long-press)
         if self._radial_menu_active and self._radial_menu_center is not None:
