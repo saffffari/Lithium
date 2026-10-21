@@ -83,3 +83,26 @@ push — your local build validates the recipe before the first tag.
 - Manual import/paint/restart, cross-monitor DPI, training/inference,
   and packaged installer validation have not been completed. This is
   a verified source launch, not an installer build.
+
+### Packaged build and real bundle import
+
+- Integrated the existing `worktree-reader-kit` branch so the Windows
+  app includes File > Import / Export Project (`.li`). The original
+  main branch did not contain the portable-bundle importer.
+- Corrected the model-bundle test fixture to write fixed LF bytes;
+  Windows text-mode CRLF translation otherwise changes its expected size.
+- Complete Windows suite after integration: **225 passed**.
+- Built `Lithium.exe` with PyInstaller and `LithiumSetup-1.1.0.exe`
+  with Inno Setup 6.7.3. Packaged app startup verified visually.
+- Recovered the existing Kevin kit from the separate Linux SSD mounted
+  read-only with Btrfs journal replay disabled. Both the 54-cloud
+  starter and 175-cloud VerSe package have 64,000 points per cloud.
+- Imported both real bundles into fresh Windows catalogs; checked
+  every cloud/label hash, array length, archive CRC, ontology, and
+  persisted project membership after reopening.
+- In the packaged executable, used File > Import Project to import
+  the 175-cloud bundle through the native file picker. Verified the
+  175-cloud / 11.2-million-point gallery and opened a labelled 64k
+  vertebra in Light Table at 60 fps.
+- Installer installation/uninstallation, cross-monitor DPI, and the
+  separate training/inference environment remain untested.

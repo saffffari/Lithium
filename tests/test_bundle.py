@@ -169,7 +169,7 @@ def test_model_export_and_import(tmp_path, monkeypatch):
     run = tmp_path / "run"
     (run / "model").mkdir(parents=True)
     (run / "model" / "model_best.pth").write_bytes(os.urandom(4096))
-    (run / "config.py").write_text("x = 1\n")
+    (run / "config.py").write_bytes(b"x = 1\n")
     reg = ProjectModelRegistry(library_paths.library_dir())
     tm = TrainedModel(name="toy", status="completed", best_checkpoint=str(run / "model" / "model_best.pth"),
                       last_checkpoint=str(run / "model" / "model_best.pth"), work_dir=str(run),
