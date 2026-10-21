@@ -83,7 +83,7 @@ def gl_context():
         pytest.skip("GLFW init failed; no headless GL available")
 
     glfw.window_hint(glfw.CONTEXT_VERSION_MAJOR, 4)
-    glfw.window_hint(glfw.CONTEXT_VERSION_MINOR, 3)
+    glfw.window_hint(glfw.CONTEXT_VERSION_MINOR, 1)  # Match the viewer's GL 4.1 minimum.
     glfw.window_hint(glfw.OPENGL_PROFILE, glfw.OPENGL_CORE_PROFILE)
     glfw.window_hint(glfw.OPENGL_FORWARD_COMPAT, True)
     glfw.window_hint(glfw.VISIBLE, False)

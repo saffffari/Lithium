@@ -4,7 +4,6 @@ import sys
 
 import glfw
 import imgui
-from imgui.integrations.glfw import GlfwRenderer
 from src.gui.scale import init_scale, get_scale, s
 
 
@@ -101,6 +100,9 @@ class ImGuiLayer:
     """Manages ImGui lifecycle within a GLFW/OpenGL context."""
 
     def __init__(self, window):
+        from src.core.gl_platform import configure_opengl_platform
+        configure_opengl_platform(window)
+        from imgui.integrations.glfw import GlfwRenderer
         imgui.create_context()
 
         # Get DPI scale before creating renderer

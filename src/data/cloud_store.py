@@ -452,6 +452,11 @@ def save_cloud_labels(file_key: str, labels: np.ndarray,
             except OSError:
                 pass
             return msg
+        # A verified canonical save supersedes any interrupted-stroke snapshot.
+        try:
+            target.with_name(target.stem + ".recovery.npy").unlink(missing_ok=True)
+        except OSError as exc:
+            print(f"Recovery cleanup failed for {file_key}: {exc}")
         return None
 
     if catalog is not None and hasattr(catalog, "labels_lock_for"):
@@ -613,6 +618,48 @@ def load_cloud_labels(file_key: str,
     except (OSError, ValueError) as e:
         print(f"Catalog labels load failed for {file_key}: {e}")
         return None
+
+
+def pending_label_recovery(file_key: str, namespace: str | None = None):
+    """Read a newer, shape-compatible crash snapshot without changing saved labels."""
+    canonical = cloud_labels_path(file_key, namespace)
+    path = canonical.with_name(canonical.stem + '.recovery.npy')
+    try:
+        if not path.exists() or (canonical.exists() and
+                path.stat().st_mtime_ns <= canonical.stat().st_mtime_ns):
+            return None
+        arr = np.load(path, allow_pickle=False)
+        saved = load_cloud_labels(file_key, namespace)
+        if arr.ndim != 1 or not np.issubdtype(arr.dtype, np.integer):
+            return None
+        if saved is not None and arr.shape != saved.shape:
+            return None
+        data = load_cloud_data(file_key)
+        if data is None or len(arr) != data[0].point_count:
+            return None
+        return np.asarray(arr, dtype=np.int32)
+    except (OSError, ValueError):
+        return None
+
+
+def resolve_label_recovery(file_key: str, restore: bool,
+                           namespace: str | None = None, catalog=None):
+    """Keep the last commit, or back it up and atomically restore the snapshot."""
+    path = cloud_labels_path(file_key, namespace)
+    if restore:
+        arr = pending_label_recovery(file_key, namespace)
+        if arr is None:
+            return 'Recovery snapshot is missing, outdated, or has incompatible points.'
+        if path.exists():
+            _directory, saved, failed = snapshot_labels([file_key], namespace)
+            if failed or saved != 1:
+                return 'Could not back up committed labels; recovery snapshot was kept.'
+        return save_cloud_labels(file_key, arr, catalog=catalog, namespace=namespace)
+    try:
+        path.with_name(path.stem + '.recovery.npy').unlink(missing_ok=True)
+    except OSError as exc:
+        return str(exc)
+    return None
 
 
 # ---------------------------------------------------------------------------

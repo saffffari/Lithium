@@ -114,8 +114,12 @@ def draw_main_menu_bar(app) -> float:
     timeline) must offset by its height so they don't overlap.
     """
     bar_h = 0.0
+    if getattr(app, '_window_chrome', None) is not None:
+        imgui.push_style_var(imgui.STYLE_FRAME_PADDING, (s(8), s(7)))
     if imgui.begin_main_menu_bar():
         bar_h = imgui.get_window_height()
+        from src.gui.window_header import draw_brand
+        draw_brand(app, bar_h)
 
         if imgui.begin_menu("File", True):
             if imgui.menu_item("Import File...", "", False, True)[0]:
@@ -150,12 +154,18 @@ def draw_main_menu_bar(app) -> float:
             if imgui.menu_item("Redo", "Ctrl+Shift+Z", False, True)[0]:
                 app._do_redo()
             imgui.separator()
-            if imgui.menu_item("Clear 3D Cursor + Fit", "C", False, True)[0]:
+            if imgui.menu_item("Clear 3D Cursor + Fit", "", False, True)[0]:
                 app.cursor3d.clear()
                 app._fit_camera()
             imgui.end_menu()
 
         if imgui.begin_menu("View", True):
+            if imgui.begin_menu('Performance'):
+                for value, title in (('auto', 'Automatic'), ('lean', 'Lean'), ('workstation', 'Workstation')):
+                    if imgui.menu_item(title, '', app.performance_preference == value, True)[0]:
+                        app.set_performance_profile(value)
+                imgui.text_disabled('Current: ' + app.resource_budget.name)
+                imgui.end_menu()
             if imgui.menu_item("Contact Sheets", "1",
                                app.mode == MODE_CONTACT_SHEETS, True)[0]:
                 app.mode = MODE_CONTACT_SHEETS
@@ -194,7 +204,11 @@ def draw_main_menu_bar(app) -> float:
                 app.show_shortcuts = not app.show_shortcuts
             imgui.end_menu()
 
+        from src.gui.window_header import draw_header
+        draw_header(app, bar_h)
         imgui.end_main_menu_bar()
+    if getattr(app, '_window_chrome', None) is not None:
+        imgui.pop_style_var()
     return bar_h
 
 
@@ -260,9 +274,12 @@ def draw_settings_panel(app) -> bool:
         points = sum(e.point_count for e in app.entries)
         cloud_count = len(app.entries)
     pending = app.catalog.pending_count if app.catalog else 0
-    op1_stats_strip(app, cloud_count, points, pending, mode_str, app.fps,
-                    active_name=active_name)
-    imgui.spacing()
+    # Light Table already names the selected cloud in its list and shows
+    # its point count in the unified header; keep the controls above the fold.
+    if app.mode != MODE_LIGHT_TABLE:
+        op1_stats_strip(app, cloud_count, points, pending, mode_str, app.fps,
+                        active_name=active_name)
+        imgui.spacing()
 
     # --- TAB BAR ---
     _draw_tab_bar(app)
@@ -276,6 +293,7 @@ def draw_settings_panel(app) -> bool:
     elif app.mode == MODE_AUTOMATION:
         _draw_train_tab(app)
 
+    app._sidebar_scroll_max = imgui.get_scroll_max_y()
     imgui.end()
     imgui.pop_style_var(1)
     imgui.pop_style_color(1)
@@ -288,6 +306,8 @@ def draw_settings_panel(app) -> bool:
     _draw_gallery_ctx_popup(app)
     _draw_gallery_rename_modal(app)
     bundle_dialog.draw_bundle_modals(app)
+    from src.gui.recovery_dialog import draw_recovery_dialog
+    draw_recovery_dialog(app)
 
     return changed
 
@@ -1558,11 +1578,10 @@ def _draw_labels_section(app, child_id: str = "##labels") -> bool:
         changed |= draw_label_add_button(app)
 
         stored = getattr(app, '_labels_list_h', 0.0)
-        # Auto height = the rows themselves (measured last frame), capped at
-        # 10 lines; a dragged height pins it, double-click on the handle
-        # goes back to auto.
+        # Up to six full-sized rows by default; larger ontologies scroll
+        # inside the list. A dragged height pins a custom amount.
         _content_h = float(getattr(app, '_labels_content_h', 0.0) or 0.0)
-        _cap = stored if stored > 0 else th * 10   # a dragged height only caps
+        _cap = stored if stored > 0 else th * 12.0
         label_max_h = (min(_cap, max(th * 3.0, _content_h + th * 0.35))
                        if _content_h > 0 else _cap)
         min_h = th * 3.0
@@ -1571,6 +1590,7 @@ def _draw_labels_section(app, child_id: str = "##labels") -> bool:
         imgui.begin_child(child_id, 0, label_max_h, border=False)
         changed |= draw_label_panel(app)
         app._labels_content_h = imgui.get_cursor_pos_y()
+        app._labels_scroll_max = imgui.get_scroll_max_y()
         imgui.end_child()
 
         # --- Resize handle ---
@@ -2099,8 +2119,7 @@ def _draw_light_table_tab(app) -> bool:
     changed = False
     th = imgui.get_text_line_height()
 
-    # Labels are always on in Light Table — no toggle button.
-    app.label_blend = 1.0
+    # Label view defaults on; respect the L shortcut and persisted choice.
 
     # --- CLOUDS ---
     # Bottom-anchored layout: CLOUDS absorbs whatever the sections below it
@@ -2108,7 +2127,15 @@ def _draw_light_table_tab(app) -> bool:
     # and RUN INFERENCE is always on screen.
     # CLOUDS: ~10 rows by default; the handle under it pins a height,
     # double-click on the handle returns to the default.
-    changed |= _draw_clouds_section(app, "##lt_clouds", height=th * 15.5)
+    remaining = imgui.get_content_region_available()[1]
+    rest_h = getattr(app, '_lt_after_clouds_h', th * 65.0)
+    cloud_overhead = getattr(app, '_lt_cloud_overhead', th * 2.5)
+    cloud_y0 = imgui.get_cursor_pos_y()
+    changed |= _draw_clouds_section(app, "##lt_clouds",
+        height=max(th * 3.0, remaining - rest_h - cloud_overhead))
+    app._lt_cloud_overhead = (imgui.get_cursor_pos_y() - cloud_y0
+                             - app._lt_clouds_child_h)
+    after_clouds_y0 = imgui.get_cursor_pos_y()
 
     # --- VOLUME metadata (shown when selected cloud is volume-derived) ---
     if 0 <= app.selected_index < len(app.entries):
@@ -2167,11 +2194,6 @@ def _draw_light_table_tab(app) -> bool:
     # Flexible spacer: whatever the controls stack (measured last frame)
     # does not need is left empty here, so the stack ends at the bottom
     # edge of the bar with RUN INFERENCE as the last thing.
-    _lt_stack_h = getattr(app, '_lt_stack_h', None)
-    if _lt_stack_h is not None:
-        _lt_spare = imgui.get_content_region_available()[1] - _lt_stack_h - th * 0.3
-        if _lt_spare > 0:
-            imgui.dummy(1, _lt_spare)
     _lt_stack_y0 = imgui.get_cursor_screen_pos()[1]
     changed |= _draw_viewport_view_controls(app)
 
@@ -2199,6 +2221,7 @@ def _draw_light_table_tab(app) -> bool:
     )
     # Controls stack height (from the spacer to here), for next frame's spacer.
     app._lt_stack_h = imgui.get_cursor_screen_pos()[1] - _lt_stack_y0
+    app._lt_after_clouds_h = imgui.get_cursor_pos_y() - after_clouds_y0
     return changed
 
 

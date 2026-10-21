@@ -191,6 +191,9 @@ def test_model_export_and_import(tmp_path, monkeypatch):
     assert len(models) == 1 and models[0].has_checkpoint
     assert models[0].best_checkpoint.startswith(library_paths.library_dir())
     assert models[0].class_map["1"] == "Superior_Endplate"
+    from pathlib import Path
+    assert Path(models[0].best_checkpoint).read_bytes() == (run / "model/model_best.pth").read_bytes()
+    assert (Path(models[0].work_dir) / "config.py").read_bytes() == b"x = 1\n"
     assert p.settings["active_model_id"] == tm.model_id
 
     # exporting without models drops the active_model_id so the other

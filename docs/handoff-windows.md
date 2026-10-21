@@ -1,108 +1,20 @@
-# Windows handoff — verification + build
+# Windows handoff � 2026-10-21
 
-For the agent (or human) working in this repo cloned on the Windows
-box. Goal: verify Lithium 1.1 on Windows and produce a local installer
-build. All 1.1 development happened on Linux; 1.0 was Windows-native,
-so expect small breaks, not structural ones.
+Native Windows viewer, built from the same source used for Linux verification. No WSL, Python or CUDA is required for the packaged annotation app.
 
-## 1. Environment
+## Verification
 
-```bat
-python -m venv .venv            & rem Python 3.12 x64
-.venv\Scripts\activate
-pip install -r requirements-lock.txt
-python -m pytest tests -q       & rem expect 210 passed, 3 skipped
-python -m src.main              & rem app boots to SHEETS
-```
+- Windows and Linux suites: **250 passed each**, including GL label rendering.
+- Hidden production App workflow: **15 checks passed** (annotation tools, label protection, GPU/disk updates, undo/redo, autosave/snapshots, portable projects, measurements, display/camera, sidebar layout, PNG/spin export).
+- Forced-exit recovery tested on 64k points, restoring 714 interrupted-stroke points with a backup of the previous commit.
+- Real packages: 54-cloud starter and 175-cloud review set, every cloud 64k points, existing labels. Import hashes, ontology and persisted membership verified. Earlier packaged GUI import of the 175-cloud set was inspected; the final binary is also checked through a hidden timed startup.
+- Adaptive profiles retain workstation cache capacity and use bounded caches for lower-memory machines. Full results and limits: [optimization report](optimization-2026-10.md).
+- Windows single-row header: logo and fixed product title at the left; menus and window controls in the same row. Original sidebar control sizes remain; large label sets and short windows scroll, and the cloud list absorbs extra height.
 
-## 2. Verification checklist (things most likely to have rotted)
+## Delivery
 
-- [ ] **Boot + fonts** — segoeui.ttf discovery in
-      `src/gui/imgui_layer.py:_find_system_font`; title bar dark via
-      DWM (`_apply_dark_title_bar`).
-- [ ] **DPI** — drag the window between monitors with different scale
-      factors; the UI must rebuild (new in 1.1:
-      `_on_content_scale` → `ImGuiLayer.rebuild_for_scale`). GLFW on
-      Windows fires content-scale changes on monitor move — confirm.
-- [ ] **Import** — PLY + LAS via File menu (tkinter dialogs) and
-      drag-drop; catalog write to `%USERPROFILE%\.lithium\library`.
-- [ ] **Label paint + restart** — paint, quit, relaunch, labels
-      persist (atomic os.replace path on NTFS).
-- [ ] **v2 label migration** — if this machine has a 1.0 library,
-      first launch migrates `labels\` to per-namespace subdirs;
-      verify counts + `labels\.v2-migrated` marker.
-- [ ] **Projects** — create, duplicate (labels copied), delete.
-- [ ] **Light Table INFER button** renders (idle constellation) even
-      without a model.
-- [ ] **Training env** (optional, needs NVIDIA): follow the Windows
-      recipe in docs/training_setup.md; note the 1.1 additions —
-      peft + wandb now required, `amp_dtype=bfloat16` default,
-      `tools/train_until_done.sh` is bash-only (use WSL or run
-      launch_training.py directly; a .ps1 port is welcome).
-      Set `LITHIUM_TRAIN_PYTHON` instead of --python-exe.
-- [ ] **CLI render** — `python -m src.main render <ply> --output out\`.
+`LithiumSetup-1.1.0.exe` is built with PyInstaller and Inno Setup. It installs into the current user's LocalAppData Programs folder without administrator rights and includes README/documentation. The review kit ZIP also includes the two original `.li` packages, original selection notes, checksums, and import/QA results. It is prepared for the user to upload and send; no email or dataset upload is performed automatically.
 
-Known Windows-specific code paths to eyeball if something breaks:
-`src/main.py` `_apply_dark_title_bar` / AppUserModelID block,
-`src/data/catalog_lock.py` (file locking), `model_registry._path`
-(filename sanitization), `num-worker 2` default in launch_training
-(Windows DataLoader IPC deadlock — keep it).
+## Remaining environment requirements
 
-## 3. Build the installer
-
-```bat
-pip install pyinstaller
-pyinstaller lithium.spec --noconfirm     & rem dist\Lithium.exe (onefile)
-rem Install Inno Setup 6 (winget install JRSoftware.InnoSetup), then:
-iscc packaging\lithium.iss               & rem dist\LithiumSetup-1.1.0.exe
-```
-
-Smoke the installer in a Windows Sandbox if available: install, launch,
-import a PLY, uninstall cleanly.
-
-## 4. Report back
-
-Fix what you find (commit with the repo's conventional style), and
-record verification results in this file under a "## Results" heading.
-CI (.github/workflows/release.yml) builds the same artifacts on tag
-push — your local build validates the recipe before the first tag.
-
-## Results — 2026-10-21
-
-- Checked out `main` at `01b560d` on Windows x64; installed Python
-  3.12.13 and `requirements-lock.txt` in an isolated environment.
-- `python -m pytest tests -q`: **220 passed**, including the real
-  OpenGL tests; no skipped tests. Updated the stale GPU-label readback
-  test to use `label_vbo` rather than the position-buffer alias and
-  verify that label edits preserve position, color, and selection data.
-- Native desktop startup verified visually: Contact Sheets renders,
-  fonts and controls are visible, window reports 60 fps, and startup
-  stderr is empty. A timed launch also exited cleanly.
-- The local launcher keeps its fresh library and preferences in a
-  workspace-local profile; existing Linux datasets were not imported.
-- Manual import/paint/restart, cross-monitor DPI, training/inference,
-  and packaged installer validation have not been completed. This is
-  a verified source launch, not an installer build.
-
-### Packaged build and real bundle import
-
-- Integrated the existing `worktree-reader-kit` branch so the Windows
-  app includes File > Import / Export Project (`.li`). The original
-  main branch did not contain the portable-bundle importer.
-- Corrected the model-bundle test fixture to write fixed LF bytes;
-  Windows text-mode CRLF translation otherwise changes its expected size.
-- Complete Windows suite after integration: **225 passed**.
-- Built `Lithium.exe` with PyInstaller and `LithiumSetup-1.1.0.exe`
-  with Inno Setup 6.7.3. Packaged app startup verified visually.
-- Recovered the existing Kevin kit from the separate Linux SSD mounted
-  read-only with Btrfs journal replay disabled. Both the 54-cloud
-  starter and 175-cloud VerSe package have 64,000 points per cloud.
-- Imported both real bundles into fresh Windows catalogs; checked
-  every cloud/label hash, array length, archive CRC, ontology, and
-  persisted project membership after reopening.
-- In the packaged executable, used File > Import Project to import
-  the 175-cloud bundle through the native file picker. Verified the
-  175-cloud / 11.2-million-point gallery and opened a labelled 64k
-  vertebra in Light Table at 60 fps.
-- Installer installation/uninstallation, cross-monitor DPI, and the
-  separate training/inference environment remain untested.
+Pointcept training/inference needs its separate configured Python/CUDA environment and a model; it was not executed in this review environment. The model-containing `.li` import path is tested. Open3D mesh reconstruction is optional and absent in this build; failure is reported and the point view remains available. Native CachyOS visual comparison, cross-monitor DPI movement and Windows HDR/profile matching require later desktop inspection.

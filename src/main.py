@@ -77,7 +77,8 @@ from src.rendering.gallery_cache import GalleryCache, MAX_DIRTY_PER_FRAME
 # across frames, prioritised to whichever cells are currently visible. 8 ×
 # ~3-5 ms/upload comfortably fits a 60 fps frame, and visible cells (≤ 24
 # in a typical layout) populate within 3 frames of scrolling into view.
-MAX_LAZY_PREVIEW_UPLOADS_PER_FRAME = 8
+from src.core.resource_budget import GALLERY_UPLOADS_PER_FRAME
+MAX_LAZY_PREVIEW_UPLOADS_PER_FRAME = GALLERY_UPLOADS_PER_FRAME
 from src.core.envelope import Envelope
 from src.gui.imgui_layer import ImGuiLayer
 # imgui itself is already loaded (and paid for) via imgui_layer; the
@@ -510,7 +511,9 @@ class App:
         # Async full-resolution loading
         from concurrent.futures import ThreadPoolExecutor
         self._full_res_executor = ThreadPoolExecutor(max_workers=1)
-        self._full_res_pending = None  # (index, Future, model_xform) or None
+        self._preview_executor = ThreadPoolExecutor(max_workers=1)
+        self._preview_pending = {}
+        self._full_res_pending = None  # (index, Future, model_xform, file_key, namespace)
 
         # Training sidecar
         self.training_runner = None
@@ -557,6 +560,9 @@ class App:
         # never goes through compute_grid more than once per change.
         from src.utils.prefs import load_prefs
         prefs = load_prefs()
+        self.performance_preference = str(prefs.get('performance_profile', 'auto'))
+        from src.core.resource_budget import LEAN
+        self.resource_budget = LEAN
         self.gallery_cell_size: int = int(prefs.get("gallery_cell_size", 220))
         # Labels panel height (draggable resize handle in sidebar)
         self._labels_list_h: float = float(prefs.get("labels_list_h", 0.0))
@@ -698,7 +704,10 @@ class App:
         # Get monitor work area for maximized launch
         monitor = glfw.get_primary_monitor()
         mode = glfw.get_video_mode(monitor)
-        glfw.window_hint(glfw.MAXIMIZED, True)
+        hidden = os.environ.get('LITHIUM_HIDDEN') == '1'
+        glfw.window_hint(glfw.VISIBLE, not hidden)
+        glfw.window_hint(glfw.FOCUSED, not hidden)
+        glfw.window_hint(glfw.MAXIMIZED, not hidden)
 
         self.window = glfw.create_window(mode.size.width, mode.size.height,
                                          "L I T H I U M", None, None)
@@ -710,6 +719,8 @@ class App:
         self.width, self.height = glfw.get_framebuffer_size(self.window)
 
         glfw.make_context_current(self.window)
+        from src.core.gl_platform import configure_opengl_platform
+        configure_opengl_platform(self.window)
         glfw.swap_interval(1)
 
         # Set window icon
@@ -717,6 +728,14 @@ class App:
 
         # Force dark title bar on Windows via DWM
         self._apply_dark_title_bar()
+
+        self._window_chrome = None
+        try:
+            from src.core.window_chrome import install
+            self._window_chrome = install(self.window)
+            self.width, self.height = glfw.get_framebuffer_size(self.window)
+        except Exception as e:
+            print(f"Custom window header unavailable: {e}")
 
         self._pending_content_scale: float | None = None
         glfw.set_framebuffer_size_callback(self.window, self._on_resize)
@@ -749,6 +768,7 @@ class App:
 
     def init_gl(self):
         self.ctx = moderngl.create_context()
+        self.set_performance_profile(self.performance_preference, persist=False)
         self.ctx.enable(moderngl.DEPTH_TEST | moderngl.PROGRAM_POINT_SIZE | moderngl.BLEND)
         self.ctx.blend_func = (moderngl.SRC_ALPHA, moderngl.ONE_MINUS_SRC_ALPHA)
         self.program = create_point_cloud_program(self.ctx)
@@ -776,7 +796,7 @@ class App:
         # Gallery cache: persistent RGBA16F target for Contact Sheets.
         # See gallery_cache.py for rationale. pp_gallery_blit samples it
         # into scene_rt each frame at the gallery area viewport.
-        self.gallery_cache = GalleryCache(self.ctx)
+        self.gallery_cache = GalleryCache(self.ctx, self.resource_budget.thumbnail_bytes)
         self.pp_gallery_blit = FullscreenPass(self.ctx, 'pp_gallery_blit', 'gallery_blit.frag')
 
         # === SSAO pipeline ============================================
@@ -795,11 +815,11 @@ class App:
         # white so the tonemap multiply becomes a no-op.
         from src.rendering.ssao import generate_kernel, generate_noise
         self.ssao_rt = RenderTarget(
-            self.ctx, self.width, self.height,
+            self.ctx, 1, 1,
             components=1, color_dtype='f2', with_depth=False,
         )
         self.ssao_blur_rt = RenderTarget(
-            self.ctx, self.width, self.height,
+            self.ctx, 1, 1,
             components=1, color_dtype='f2', with_depth=False,
         )
         self.pp_ssao = FullscreenPass(self.ctx, 'pp_ssao', 'ssao.frag')
@@ -874,33 +894,26 @@ class App:
         }
         self.ssao_enabled = bool(getattr(self, "ssao_enabled", False))
 
-        # === Selection-outline pipeline =============================
-        # When a vertebra is selected in HOLOGRAM we want a 2-pixel
-        # orange silhouette stroke around its outer boundary — NOT a
-        # body tint. We render selected meshes into a single-channel
-        # mask buffer that shares scene_rt's depth (so occluded parts
-        # don't outline through other bones), then a fullscreen edge-
-        # detection pass reads the mask and alpha-blends an orange
-        # stroke onto the tonemapped backbuffer.
-        self.selection_mask_tex = self.ctx.texture(
-            (self.width, self.height), components=1, dtype='f2',
-        )
-        self.selection_mask_tex.filter = (
-            moderngl.NEAREST, moderngl.NEAREST)
-        self.selection_mask_tex.repeat_x = False
-        self.selection_mask_tex.repeat_y = False
-        # Share scene_rt.depth so depth-test against the already-drawn
-        # scene excludes occluded fragments from the mask.
-        self.selection_mask_fbo = self.ctx.framebuffer(
-            color_attachments=[self.selection_mask_tex],
-            depth_attachment=self.scene_rt.depth,
-        )
-        self.pp_outline = FullscreenPass(
-            self.ctx, 'pp_outline', 'pp_outline.frag')
-        try:
-            self.pp_outline.prog['u_mask'].value = 0
-        except KeyError:
-            pass
+        # Selection outlines belong to a retired mode; no Lithium render
+        # path uses them. Do not allocate a screen-sized mask/extra shader.
+        self.selection_mask_tex = None
+        self.selection_mask_fbo = None
+        self.pp_outline = None
+
+    def set_performance_profile(self, preference, persist=True):
+        from src.core.resource_budget import choose_budget, physical_memory_bytes, dedicated_memory_bytes
+        self.performance_preference = preference if preference in ('auto', 'lean', 'workstation') else 'auto'
+        self.resource_budget = choose_budget(self.performance_preference, physical_memory_bytes(),
+            dedicated_memory_bytes(self.ctx) if self.ctx is not None else 0,
+            self.ctx.info.get('GL_RENDERER', '') if self.ctx is not None else '')
+        cache = getattr(self, 'gallery_cache', None)
+        if cache is not None:
+            cache.max_bytes = self.resource_budget.thumbnail_bytes
+            cache._evict_if_needed()
+        if persist:
+            from src.utils.prefs import update_prefs
+            update_prefs({'performance_profile': self.performance_preference})
+        print(f'[performance] {self.performance_preference}: {self.resource_budget.name}')
 
     def init_gui(self):
         self.gui = ImGuiLayer(self.window)
@@ -936,51 +949,52 @@ class App:
         return ready
 
     def _ensure_preview_gpu(self, entry) -> bool:
-        """Lazy-load + upload the preview GPU buffer for ``entry``.
-
-        Returns True if a load+upload actually happened on this call (so
-        the caller can decrement its per-frame budget). Returns False if
-        the entry already has a preview_gpu, or there's nothing on disk
-        to load (no cached .npz, no catalog), or the load failed.
-
-        Called from ``_render_gallery`` for visible cells whose buffers
-        haven't been uploaded yet — this is what replaces the old
-        synchronous "upload everything in set_active_view" path.
-        """
-        if entry.preview_gpu is not None:
-            return False
-        if self.catalog is None:
+        """Queue preview I/O off-thread; upload completed results on the GL thread."""
+        entry._resident_touch = time.perf_counter()
+        if entry.preview_gpu is not None or self.catalog is None:
             return False
         file_key = getattr(entry, 'file_key', None)
-        if not file_key:
-            return False
         lib_entry = self.catalog.entries.get(file_key)
-        if lib_entry is None:
+        if lib_entry is None or getattr(entry, '_preview_failed', False):
             return False
-        preview = self.catalog.get_preview(lib_entry)
-        if preview is None:
+        from src.data import cloud_store
+        namespace = cloud_store.active_label_namespace()
+        full = entry.full_gpu.cloud_data if entry.full_gpu is not None else None
+        version = full.labels_version if full is not None else -1
+        key = (id(entry), namespace, version)
+        # Discard an older snapshot if full-res labels changed while it loaded.
+        for old in list(self._preview_pending):
+            if old[0] == id(entry) and old != key:
+                self._preview_pending.pop(old).cancel()
+        future = self._preview_pending.get(key)
+        if future is None:
+            path = lib_entry.preview_path(self.catalog.dir)
+            if len(self._preview_pending) >= 4 or not os.path.exists(path):
+                return False
+            self._preview_pending[key] = self._preview_executor.submit(
+                self._preview_load_job, file_key, path, namespace,
+                full.positions if full is not None else None,
+                full.labels.copy() if full is not None else None,
+            )
             return False
-        preview.model_transform = entry.model_transform
-        # Restore preview-resolution labels if persisted alongside the cloud.
-        stored_prev = load_preview_labels(
-            file_key, expect_count=preview.point_count)
-        if stored_prev is None:
-            # No preview-res labels saved, but the cloud may carry
-            # full-resolution manual labels in the catalog store. Transfer
-            # them onto the (downsampled) preview points by nearest
-            # neighbour so the thumbnail shows its labels in Contact Sheets
-            # without the cloud ever being opened, and cache the result.
-            stored_prev = self._derive_preview_labels_from_full(
-                file_key, preview)
-            if stored_prev is not None:
-                try:
-                    save_preview_labels(file_key, stored_prev)
-                except Exception:
-                    pass
-        if stored_prev is not None and preview.labels is not None:
-            preview.labels[:] = stored_prev
-        gpu = upload_cloud(preview, self.ctx, self.program)
+        if not future.done():
+            return False
+        self._preview_pending.pop(key)
+        try:
+            preview, mapping = future.result()
+            preview.model_transform = entry.model_transform
+            gpu = upload_cloud(preview, self.ctx, self.program)
+        except Exception as exc:
+            entry._preview_failed = True
+            print(f'Preview load failed for {entry.name}: {exc}')
+            return False
         entry.preview_gpu = gpu
+        lib_entry.preview_data = None
+        if mapping is not None and full is not None:
+            entry._preview_to_full_idx_cache = ((id(full), preview.point_count), mapping)
+        # This small derived array is cached after the main thread accepts the
+        # result, so a stale worker cannot overwrite a newer preview label file.
+        save_preview_labels(file_key, preview.labels, namespace=namespace)
         if entry.bounds_min is None:
             entry.bounds_min = preview.bounds_min.copy()
             entry.bounds_max = preview.bounds_max.copy()
@@ -990,7 +1004,29 @@ class App:
         self.gpu_clouds.append(gpu)
         return True
 
-    def _derive_preview_labels_from_full(self, file_key, preview):
+    def _preview_load_job(self, file_key, path, namespace,
+                          full_positions=None, full_labels=None):
+        """Read/decompress/project labels without touching App state or GL."""
+        from src.data.point_cloud import PointCloudData
+        with np.load(path, allow_pickle=False) as data:
+            preview = PointCloudData(positions=data['positions'], colors=data['colors'],
+                                     file_path=path)
+        mapping = None
+        if full_positions is not None:
+            from src.core.preview_merge import build_preview_to_full_idx
+            mapping = build_preview_to_full_idx(preview.positions, full_positions)
+            if mapping is not None:
+                preview.labels[:] = full_labels[mapping]
+        else:
+            labels = load_preview_labels(file_key, expect_count=preview.point_count,
+                                         namespace=namespace)
+            if labels is None:
+                labels = self._derive_preview_labels_from_full(file_key, preview, namespace)
+            if labels is not None:
+                preview.labels[:] = labels
+        return preview, mapping
+
+    def _derive_preview_labels_from_full(self, file_key, preview, namespace=None):
         """Nearest-neighbour transfer of full-resolution catalog labels
         onto the preview's downsampled points.
 
@@ -1004,7 +1040,7 @@ class App:
         Returns an int32 array of length ``preview.point_count``, or None
         when there are no usable full labels / coordinates to map from.
         """
-        full_labels = load_cloud_labels(file_key)
+        full_labels = load_cloud_labels(file_key, namespace)
         if full_labels is None:
             return None
         full_labels = np.asarray(full_labels, dtype=np.int32).reshape(-1)
@@ -1167,7 +1203,7 @@ class App:
         self.catalog.add_to_project(cid, [file_key])
 
     def _load_cloud_via_catalog(self, file_key: str | None,
-                                 source_path: str | None):
+                                 source_path: str | None, namespace: str | None = None):
         """Load a cloud, preferring the catalog data file over re-parsing the source.
 
         Returns ``(cloud, source_was_used)``: a populated PointCloudData
@@ -1191,7 +1227,7 @@ class App:
                         f"manually if you want to refresh the points."
                     )
                 # Apply any persisted labels on top.
-                stored_labels = load_cloud_labels(file_key)
+                stored_labels = load_cloud_labels(file_key, namespace)
                 if stored_labels is not None and len(stored_labels) == cloud.point_count:
                     cloud.labels[:] = stored_labels
                 elif stored_labels is not None:
@@ -1266,7 +1302,7 @@ class App:
             'ssao_enabled': bool(self.ssao_enabled),
         })
 
-    def _persist_cloud_labels(self, entry, cloud) -> None:
+    def _persist_cloud_labels(self, entry, cloud) -> bool:
         """Write the cloud's current labels to the catalog labels store.
 
         Hooked from ``_after_label_mutation`` so every brush stroke,
@@ -1282,18 +1318,25 @@ class App:
         """
         file_key = getattr(entry, 'file_key', None)
         if not file_key or cloud is None or cloud.labels is None:
-            return
+            return False
         expected = int(getattr(entry, 'point_count', 0) or 0)
         if expected and cloud.labels.shape[0] != expected:
             print(f"[persist] skip {entry.name}: labels length "
                   f"{cloud.labels.shape[0]} != entry full-res {expected}; "
                   f"open in Light Table first to load the full cloud, then "
                   f"re-paint.")
-            return
+            return False
         # LS-7: route save failures through the sticky status banner so
         # the user sees them — packaged .exe has no stdout.
         # CP-4: pass catalog so the save acquires the per-file_key lock,
         # serialising any concurrent background write to the same key.
+        # Leave unresolved crash snapshots untouched until the recovery dialog
+        # offers a choice. The timer must not silently discard them on startup.
+        from src.data.cloud_store import pending_label_recovery
+        checked = getattr(self, '_recovery_checked', set())
+        recovery_key = (str(getattr(self, 'active_view', None)), file_key)
+        if recovery_key not in checked and pending_label_recovery(file_key) is not None:
+            return False
         err = save_cloud_labels(file_key, cloud.labels, catalog=self.catalog)
         if err:
             try:
@@ -1304,6 +1347,7 @@ class App:
                 )
             except AttributeError:
                 pass
+        return not bool(err)
 
     def load_file(self, path: str):
         """Load a single file at full resolution and register it in the library."""
@@ -1818,6 +1862,14 @@ class App:
         else:
             _cs.set_active_label_namespace(None)
 
+        if self._full_res_pending is not None:
+            self._full_res_pending[1].cancel()
+            self._full_res_pending = None
+        for future in self._preview_pending.values():
+            future.cancel()
+        self._preview_pending.clear()
+        if getattr(self, 'gallery_cache', None) is not None:
+            self.gallery_cache.invalidate_all()
         # Release GPU resources for the outgoing session
         for e in self.entries:
             e.release()
@@ -1930,6 +1982,7 @@ class App:
 
         # Switch.
         self.selected_index = new_entry_idx
+        new_entry._resident_touch = time.perf_counter()
         self.selection_buffer.clear()
         # Undo stack is global but every command's indices are scoped
         # to the cloud it was painted on. Switching clouds invalidates
@@ -2046,37 +2099,81 @@ class App:
         print(f"Sequence loaded: {cloud.point_count:,} points per frame")
 
     def _poll_catalog(self):
-        """Check for newly completed library previews and upload them."""
+        """Apply preview metadata; visible-cell uploads stay under their frame budget."""
         if not self.catalog:
             return
         completed = self.catalog.poll_pending()
         for lib_entry in completed:
-            # Find matching session CloudEntry by file_key
             for entry in self.entries:
-                if entry.file_key != lib_entry.file_key or entry.preview_gpu is not None:
+                if entry.file_key != lib_entry.file_key:
                     continue
-                if lib_entry.preview_data is None:
-                    break
-                lib_entry.preview_data.model_transform = entry.model_transform
-                # Apply persisted preview-resolution labels at preview-
-                # arrive time too (mirrors the load_directory path).
-                stored_prev = load_preview_labels(
-                    entry.file_key,
-                    expect_count=lib_entry.preview_data.point_count)
-                if stored_prev is not None and lib_entry.preview_data.labels is not None:
-                    lib_entry.preview_data.labels[:] = stored_prev
-                gpu = upload_cloud(lib_entry.preview_data, self.ctx, self.program)
-                entry.preview_gpu = gpu
                 if lib_entry.bounds_min is not None:
                     entry.bounds_min = lib_entry.bounds_min.copy()
                     entry.bounds_max = lib_entry.bounds_max.copy()
                 entry.point_count = lib_entry.point_count
-                self.gpu_clouds.append(gpu)
                 self._overlays_dirty = True
                 self._invalidate_entries_filter()
-                print(f"Ready: {entry.name} ({lib_entry.point_count:,} pts)")
                 break
+            # The preview is on disk. Do not retain every import's arrays
+            # or bypass the visible-only upload budget when a batch finishes.
+            lib_entry.preview_data = None
 
+    def _trim_resident_clouds(self, force: bool = False, pin=None):
+        """Evict cold cached clouds, preserving active points and verified saves."""
+        from src.core.resource_budget import eviction_candidates
+        budget = self.resource_budget
+        if self.sequence is not None or self.stroke_recorder.is_active:
+            return
+        now = time.perf_counter()
+        if not force and now - getattr(self, '_last_resident_trim', 0.0) < 0.5:
+            return
+        self._last_resident_trim = now
+        active = {id(pin)} if pin is not None else set()
+        if 0 <= self.selected_index < len(self.entries):
+            current = self.entries[self.selected_index]
+            current._resident_touch = now
+            active.add(id(current))
+        retired = set()
+        for entry in eviction_candidates(self.entries, 'full_gpu', active,
+                                         budget.full_count, budget.full_bytes):
+            gpu = entry.full_gpu
+            # Save failures keep the only live copy resident. Never sacrifice
+            # labels to meet a performance budget.
+            if not self._persist_cloud_labels(entry, gpu.cloud_data):
+                continue
+            if entry.preview_gpu is gpu:
+                entry.preview_gpu = None
+            entry.full_gpu = None
+            entry._preview_to_full_idx_cache = None
+            retired.add(id(gpu))
+            gpu.release()
+            if entry.mesh_gpu is not None:
+                entry.mesh_gpu.release()
+                entry.mesh_gpu = None
+        visible = (getattr(self, '_visible_preview_ids', set())
+                   if self.mode == MODE_CONTACT_SHEETS else set())
+        pending_index = self._full_res_pending[0] if self._full_res_pending else -1
+        if 0 <= pending_index < len(self.entries):
+            active.add(id(self.entries[pending_index]))
+        # Preview edits waiting for full-res projection remain pinned.
+        protected = active | visible | {id(e) for e in self.entries
+                                       if getattr(e, '_painted_on_preview', False)
+                                       or e.preview_gpu is e.full_gpu}
+        for entry in eviction_candidates(self.entries, 'preview_gpu', protected,
+                                         budget.preview_count, budget.preview_bytes):
+            gpu = entry.preview_gpu
+            entry.preview_gpu = None
+            entry._preview_to_full_idx_cache = None
+            retired.add(id(gpu))
+            gpu.release()
+            if self.catalog:
+                lib = self.catalog.entries.get(entry.file_key)
+                if lib is not None:
+                    lib.preview_data = None
+        if retired:
+            # The legacy list must not keep released GPU objects/CPU arrays alive.
+            self.gpu_clouds[:] = [g for g in self.gpu_clouds if id(g) not in retired]
+            self.label_count_cache.clear()
 
     def _poll_mesh_builds(self) -> None:
         """Mark session entries as mesh-dirty when a background mesh
@@ -2105,6 +2202,7 @@ class App:
         if index < 0 or index >= len(self.entries):
             return
         entry = self.entries[index]
+        entry._resident_touch = time.perf_counter()
         if entry.full_gpu is not None:
             return
         if (self._full_res_pending is not None
@@ -2121,13 +2219,18 @@ class App:
         pgpu = entry.preview_gpu
         if pgpu is not None and pgpu.cloud_data is not None:
             preview_positions = pgpu.cloud_data.positions
+        from src.data import cloud_store
+        if self._full_res_pending is not None:
+            self._full_res_pending[1].cancel()
         future = self._full_res_executor.submit(
-            self._full_res_load_job, file_key, file_path, preview_positions
+            self._full_res_load_job, file_key, file_path, preview_positions,
+            cloud_store.active_label_namespace()
         )
-        self._full_res_pending = (index, future, model_xform, file_key)
+        self._full_res_pending = (index, future, model_xform, file_key,
+                                  cloud_store.active_label_namespace())
         print(f"Loading full res: {entry.name} ...")
 
-    def _full_res_load_job(self, file_key, file_path, preview_positions):
+    def _full_res_load_job(self, file_key, file_path, preview_positions, namespace=None):
         """Background-thread body of the async full-res load.
 
         Loads the cloud (catalog-first) and, when a preview snapshot was
@@ -2137,7 +2240,7 @@ class App:
         Read-only with respect to app state (Pattern A: workers never
         mutate app.*).
         """
-        cloud, used_source = self._load_cloud_via_catalog(file_key, file_path)
+        cloud, used_source = self._load_cloud_via_catalog(file_key, file_path, namespace)
         mapping = None
         if preview_positions is not None:
             from src.core.preview_merge import build_preview_to_full_idx
@@ -2149,7 +2252,7 @@ class App:
         """Upload completed async full-res load to GPU."""
         if self._full_res_pending is None:
             return
-        index, future, model_xform, expected_key = self._full_res_pending
+        index, future, model_xform, expected_key, expected_ns = self._full_res_pending
         if not future.done():
             return
         self._full_res_pending = None
@@ -2158,6 +2261,9 @@ class App:
         entry = self.entries[index]
         # Guard against index reuse after view switch — if the entry at
         # this index is now a different cloud, discard the stale load.
+        from src.data import cloud_store
+        if cloud_store.active_label_namespace() != expected_ns:
+            return
         if getattr(entry, 'file_key', None) != expected_key:
             return
         if entry.full_gpu is not None:
@@ -2199,6 +2305,7 @@ class App:
 
             gpu = upload_cloud(cloud, self.ctx, self.program)
             entry.full_gpu = gpu
+            entry._resident_touch = time.perf_counter()
             entry.bounds_min = cloud.bounds_min.copy()
             entry.bounds_max = cloud.bounds_max.copy()
             entry.point_count = cloud.point_count
@@ -2258,6 +2365,7 @@ class App:
         if index < 0 or index >= len(self.entries):
             return
         entry = self.entries[index]
+        entry._resident_touch = time.perf_counter()
         if entry.full_gpu is not None:
             return
         try:
@@ -2267,10 +2375,12 @@ class App:
             cloud.model_transform = entry.model_transform
             gpu = upload_cloud(cloud, self.ctx, self.program)
             entry.full_gpu = gpu
+            entry._resident_touch = time.perf_counter()
             entry.bounds_min = cloud.bounds_min.copy()
             entry.bounds_max = cloud.bounds_max.copy()
             entry.point_count = cloud.point_count
             print(f"Full res: {entry.name} ({cloud.point_count:,} pts)")
+            self._trim_resident_clouds(force=True, pin=entry)
         except Exception as e:
             print(f"Error loading full res {entry.name}: {e}")
 
@@ -2504,6 +2614,10 @@ class App:
                     self._poll_catalog()
                     self._poll_full_res()
                     self._poll_mesh_builds()
+                    self._trim_resident_clouds()
+                    if glfw.get_window_attrib(self.window, glfw.ICONIFIED):
+                        glfw.wait_events_timeout(0.2)
+                        continue
                     self._update_tool_cursor()
                     self._render_frame()
                     self._update_fps()
@@ -2513,6 +2627,10 @@ class App:
                         self._fps_log_t = time.time()
                         print(f"[fps] {self.fps:.1f}  {self.width}x{self.height}", flush=True)
                     glfw.swap_buffers(self.window)
+                    focused = glfw.get_window_attrib(self.window, glfw.FOCUSED)
+                    remaining = (1.0 / 15) - (time.perf_counter() - now)
+                    if not focused and remaining > 0:
+                        glfw.wait_events_timeout(remaining)
                 except KeyboardInterrupt:
                     raise
                 except Exception as e:
@@ -2598,6 +2716,9 @@ class App:
         # multiply becomes a no-op and the curve is unchanged. Cost
         # on a 4090 is well under a millisecond at full resolution.
         ao_tex = self.ssao_disabled_tex
+        ao_size = (self.width, self.height) if self.ssao_enabled else (1, 1)
+        self.ssao_rt.resize(*ao_size)
+        self.ssao_blur_rt.resize(*ao_size)
         if (self.ssao_enabled
                 and self.scene_rt is not None
                 and self.ssao_rt is not None
@@ -3773,6 +3894,14 @@ class App:
         # Switch to mesh/both via the display-mode toggle if you want
         # the surface look back.
         effective_mode = self.display_mode
+        if entry is not None and self.catalog is not None:
+            mesh_error = self.catalog.mesh_errors.get(entry.file_key)
+            if mesh_error and effective_mode in ('mesh', 'both'):
+                effective_mode = 'points'
+                if getattr(entry, '_mesh_error_shown', None) != mesh_error:
+                    entry._mesh_error_shown = mesh_error
+                    self.set_status_banner('Mesh unavailable; showing points. ' + mesh_error,
+                        level='warn', source='mesh:' + entry.file_key)
         want_mesh = effective_mode in ("mesh", "both")
         if want_mesh and entry is not None and self.mesh_renderer is not None:
             self._ensure_mesh_gpu(entry)
@@ -3839,7 +3968,7 @@ class App:
                 )
                 mesh_drawn = True
 
-            if gpu is not None and effective_mode != "mesh":
+            if gpu is not None and (effective_mode != "mesh" or not mesh_drawn):
                 draw_cloud(
                     gpu, self.program, entry.model_transform, view, proj,
                     point_size=self.point_size,
@@ -4136,7 +4265,6 @@ class App:
         cache = self.gallery_cache
         bg = tuple(self.bg_color)
         cache.ensure_target(area_w, area_h, bg)
-        cache.set_cell_size(cell_size)
 
         global_key = (
             float(self.point_size), float(self.point_sharpness),
@@ -4162,6 +4290,13 @@ class App:
         )
         first_idx = first_row * cols
         last_idx = min(len(ready), last_row * cols)
+        from src.core.resource_budget import thumbnail_side
+        cache.set_cell_size(thumbnail_side(cell_size, last_idx - first_idx, cache.max_bytes,
+                                            self.resource_budget.thumbnail_side))
+        self._visible_preview_ids = {id(e) for e in ready[first_idx:last_idx]}
+        for key in list(self._preview_pending):
+            if key[0] not in self._visible_preview_ids:
+                self._preview_pending.pop(key).cancel()
 
         # --- Pass 0: lazy preview load + GPU upload for visible cells ----
         # Replaces the old "synchronously upload every entry in
@@ -4170,7 +4305,7 @@ class App:
         # GPU here, capped at MAX_LAZY_PREVIEW_UPLOADS_PER_FRAME so a fresh
         # 1000-entry view spreads work across frames instead of blocking
         # the main thread for seconds.
-        upload_budget = MAX_LAZY_PREVIEW_UPLOADS_PER_FRAME
+        upload_budget = self.resource_budget.uploads_per_frame
         for i in range(first_idx, last_idx):
             if upload_budget <= 0:
                 break
@@ -4197,7 +4332,7 @@ class App:
         # model/view/projection/point_size triple.
         shared_uniforms_set = False
 
-        dirty_budget = MAX_DIRTY_PER_FRAME
+        dirty_budget = self.resource_budget.dirty_per_frame
         for i in range(first_idx, last_idx):
             entry = ready[i]
             if entry.bounds_min is None or entry.bounds_max is None:
@@ -4238,7 +4373,7 @@ class App:
             cell.fbo.use()
             cbg = self.cell_bg_color
             cell.fbo.clear(cbg[0], cbg[1], cbg[2], 1.0, depth=1.0)
-            self.ctx.viewport = (0, 0, cell_size, cell_size)
+            self.ctx.viewport = (0, 0, cell.size, cell.size)
 
             view, proj = gallery_layout.fit_view_matrix(
                 entry.bounds_min, entry.bounds_max, aspect,
@@ -4248,7 +4383,7 @@ class App:
             )
             draw_cloud(
                 gpu, self.program, entry.model_transform, view, proj,
-                point_size=max(self.point_size * 0.7, 1.0),
+                point_size=max(self.point_size * 0.7, 1.0) * cell.size / cell_size,
                 skip_shared=True,
             )
             cache.mark_rendered(entry, version)
@@ -4526,8 +4661,6 @@ class App:
             self.fps = self._fps_frame_count / elapsed
             self._total_point_count = sum(e.point_count for e in self.entries)
             pts = self._total_point_count
-            mode_names = {MODE_CONTACT_SHEETS: "Contact Sheets", MODE_LIGHT_TABLE: "Light Table", MODE_AUTOMATION: "Train"}
-            mode_str = mode_names.get(self.mode, "View")
             pending = self.catalog.pending_count if self.catalog else 0
             pending_str = f" | {pending} loading" if pending > 0 else ""
             glfw.set_window_title(
@@ -4619,7 +4752,7 @@ class App:
                          'ssao_noise_tex', 'ssao_disabled_tex',
                          'selection_mask_fbo', 'selection_mask_tex',
                          'pp_outline',
-                         'label_texture', 'falloff_texture'):
+                         'label_texture', 'falloff_texture', '_header_logo'):
             obj = getattr(self, obj_name, None)
             if obj is not None:
                 try:
@@ -4629,12 +4762,15 @@ class App:
         if self.catalog:
             self.catalog.shutdown()
         self._full_res_executor.shutdown(wait=False, cancel_futures=True)
+        self._preview_executor.shutdown(wait=False, cancel_futures=True)
         # Release the catalog single-instance lock so the next launch
         # works immediately. Best-effort; never blocks shutdown.
         try:
             release_lock()
         except Exception as e:
             print(f"Catalog lock release failed: {e}")
+        if getattr(self, '_window_chrome', None) is not None:
+            self._window_chrome.close()
         glfw.terminate()
 
     def _do_undo(self):
@@ -6199,33 +6335,9 @@ class App:
         # SSAO targets resize in lockstep with the scene buffer — they
         # sample the same depth and write at the same screen resolution.
         if getattr(self, 'ssao_rt', None) is not None:
-            self.ssao_rt.resize(self.width, self.height)
+            self.ssao_rt.resize(*( (self.width, self.height) if self.ssao_enabled else (1, 1) ))
         if getattr(self, 'ssao_blur_rt', None) is not None:
-            self.ssao_blur_rt.resize(self.width, self.height)
-        # Selection mask shares scene_rt.depth, which was just
-        # reallocated above — recreate the texture + FBO so we hold a
-        # reference to the NEW depth attachment, not the released one.
-        if (getattr(self, 'selection_mask_tex', None) is not None
-                and self.scene_rt is not None):
-            try:
-                self.selection_mask_fbo.release()
-            except Exception:
-                pass
-            try:
-                self.selection_mask_tex.release()
-            except Exception:
-                pass
-            self.selection_mask_tex = self.ctx.texture(
-                (self.width, self.height), components=1, dtype='f2',
-            )
-            self.selection_mask_tex.filter = (
-                moderngl.NEAREST, moderngl.NEAREST)
-            self.selection_mask_tex.repeat_x = False
-            self.selection_mask_tex.repeat_y = False
-            self.selection_mask_fbo = self.ctx.framebuffer(
-                color_attachments=[self.selection_mask_tex],
-                depth_attachment=self.scene_rt.depth,
-            )
+            self.ssao_blur_rt.resize(*( (self.width, self.height) if self.ssao_enabled else (1, 1) ))
         # Gallery cache: the *visible* scratch RT picks up the new size
         # via ensure_target() on the next _render_gallery call. Per-entry
         # caches are NOT invalidated — cell content is identical at any

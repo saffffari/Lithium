@@ -291,6 +291,7 @@ class LibraryCatalog:
         # executor, different result shape — keeping them parallel
         # lists is cleaner than tagging each future with a kind enum.
         self._pending_mesh_futures: list[tuple[str, Future]] = []
+        self.mesh_errors: dict[str, str] = {}
         # Lock protects both pending lists and entry mutations from the
         # background thread (preview/mesh builds) vs main-thread polling.
         self._lock = __import__('threading').Lock()
@@ -655,6 +656,8 @@ class LibraryCatalog:
         if has_cloud_mesh(entry.file_key):
             return
         with self._lock:
+            if entry.file_key in self.mesh_errors:
+                return
             for fk, _ in self._pending_mesh_futures:
                 if fk == entry.file_key:
                     return
@@ -710,10 +713,10 @@ class LibraryCatalog:
             return file_key
         except MeshBuildUnavailable as e:
             print(f"Mesh build skipped for {file_key}: {e}")
-            return None
+            return (file_key, str(e))
         except Exception as e:
             print(f"Mesh build failed for {file_key}: {e}")
-            return None
+            return (file_key, str(e))
 
     def poll_pending_meshes(self) -> list[str]:
         """Drain completed mesh builds. Returns the file_keys of entries
@@ -728,9 +731,12 @@ class LibraryCatalog:
                 if fut.done():
                     try:
                         res = fut.result()
-                        if res is not None:
+                        if isinstance(res, tuple):
+                            self.mesh_errors[fk] = res[1]
+                        elif res is not None:
                             completed.append(res)
                     except Exception as e:
+                        self.mesh_errors[fk] = str(e)
                         print(f"Mesh future error for {fk}: {e}")
                 else:
                     still.append((fk, fut))

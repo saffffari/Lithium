@@ -17,10 +17,10 @@ from src.gui.theme import *
 # wall next to the machine.
 GETTING_STARTED = [
     ("1.", "CONTACT SHEETS: double-click a bone to open it"),
-    ("2.", "LIGHT TABLE: B / O / K to select points"),
-    ("3.", "G cycles the active label, Enter applies it"),
+    ("2.", "LIGHT TABLE: Choose a label, then P / O / K to paint"),
+    ("3.", "G cycles labels; tools paint immediately"),
     ("4.", "Thumb wheel or LEFT / RIGHT: next bone (autosaves)"),
-    ("5.", "Mistake? Ctrl+Z. Lost? SPACE fits the view"),
+    ("5.", "Mistake? Ctrl+Z. Lost? F focuses the view"),
 ]
 
 SHORTCUTS = [
@@ -38,23 +38,23 @@ SHORTCUTS = [
     ("NAVIGATION", [
         ("1 / 2 / 3", "Switch tab (Sheets / Light Table / Train)"),
         ("ESC", "Back to Contact Sheets / Exit"),
-        ("H", "Toggle GUI visibility"),
+        ("H / C", "Hide active label / show all labels (Light Table)"),
         ("G", "Next label (Light Table)"),
-        ("T / F / R / I", "Camera presets (top/front/right/iso)"),
-        ("SPACE", "Fit view"),
+        ("T / R / I", "Top / right / isometric view"),
+        ("SPACE", "Place 3D cursor + focus"),
         ("F", "Focus on 3D cursor"),
         ("LEFT / RIGHT", "Previous / next cloud or 4D frame"),
     ]),
     ("SELECTION", [
         ("P", "Pick tool"),
-        ("B", "Box tool"),
+        ("B / V", "Previous / next cloud (Light Table)"),
         ("O", "Lasso tool"),
         ("K", "Brush tool"),
         ("U", "Curve tool"),
         ("Shift + click", "Add to selection"),
         ("Ctrl + click", "Remove from selection"),
         ("Ctrl + scroll", "Adjust brush radius / depth limit"),
-        ("Enter", "Apply active label"),
+        ("Shift+H", "Toggle GUI visibility"),
         ("Ctrl+Z / Ctrl+Shift+Z", "Undo / Redo"),
         ("Ctrl/Cmd + / - / 0", "UI scale up / down / reset"),
         ("L", "Toggle label color view"),

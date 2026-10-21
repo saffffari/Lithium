@@ -44,18 +44,11 @@ import moderngl
 from src.rendering.render_target import RenderTarget
 
 
-# Maximum number of cells re-rendered per frame. Bounds frame time
-# while a fresh project or post-resize state populates. Bumped from
-# 32 → 24 because the per-entry pipeline does a full RT bind per cell
-# (more state churn) but we're rendering far fewer cells per frame
-# overall thanks to off-screen culling.
-MAX_DIRTY_PER_FRAME = 24
+# Per-profile frame budgets and a byte limit keep slow/small GPUs responsive.
+from src.core.resource_budget import THUMBNAIL_CACHE_BYTES, GALLERY_DIRTY_PER_FRAME
+MAX_DIRTY_PER_FRAME = GALLERY_DIRTY_PER_FRAME
 
-# Hard cap on the number of cached entry textures we keep around.
-# 768 × ~220px square × RGBA16F ≈ 290 MB worst case (220 * 220 * 8 *
-# 768 bytes). We aim for a budget that comfortably accommodates a
-# scrolled-through gallery without thrashing on a typical workstation
-# GPU. Eviction is LRU.
+# Additional count guard; the byte limit is the effective bound at high DPI.
 MAX_CACHE_ENTRIES = 768
 
 
@@ -126,8 +119,9 @@ class GalleryCache:
        preserves contents across frames — it's pure scratch space.
     """
 
-    def __init__(self, ctx: moderngl.Context):
+    def __init__(self, ctx: moderngl.Context, max_bytes: int = THUMBNAIL_CACHE_BYTES):
         self.ctx = ctx
+        self.max_bytes = max(8, int(max_bytes))
         # Visible-area scratch render target (re-used every frame)
         self.rt: RenderTarget | None = None
         self.area_w = 0
@@ -278,9 +272,17 @@ class GalleryCache:
         return cell
 
     def _evict_if_needed(self) -> None:
-        while len(self._cells) > MAX_CACHE_ENTRIES:
+        # Texture size changes with zoom/DPI, so a count alone is not a
+        # memory bound. The visible working set is sized by thumbnail_side.
+        per_cell = max(8, self._cell_size * self._cell_size * 8)
+        limit = max(1, min(MAX_CACHE_ENTRIES, self.max_bytes // per_cell))
+        while len(self._cells) > limit:
             _, victim = self._cells.popitem(last=False)
             victim.release()
+
+    @property
+    def texture_bytes(self) -> int:
+        return sum(cell.size * cell.size * 8 for cell in self._cells.values())
 
     def is_dirty(self, entry: Any, version: tuple) -> bool:
         cell = self._cells.get(_entry_key(entry))
