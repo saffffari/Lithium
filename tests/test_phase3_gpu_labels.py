@@ -2,7 +2,7 @@
 
 Uses a hidden GLFW window to create a real GL context, uploads a
 synthetic cloud with labels, and verifies:
-1. VBO upload succeeds with new format (3f 3f 1i)
+1. VBO upload succeeds with separate position, color, label, and selection buffers
 2. re_upload_labels() works
 3. Shaders compile with label uniforms
 4. Rendering into an FBO produces a non-blank image
@@ -115,15 +115,20 @@ def test_re_upload_labels():
         cloud = make_grid_cloud(10)
         program = create_point_cloud_program(ctx)
         gpu = upload_cloud(cloud, ctx, program)
+        positions_before = gpu.pos_vbo.read()
+        colors_before = gpu.col_vbo.read()
+        selection_before = gpu.selected_vbo.read()
         # Change labels and re-upload
         cloud.labels[:] = 5
         re_upload_labels(gpu)
-        # Read back the VBO to verify (Phase 4: 32 bytes/vertex = 8 int32 slots)
-        vbo_bytes = gpu.vbo.read()
-        vbo_arr = np.frombuffer(vbo_bytes, dtype=np.int32).reshape(-1, 8)
-        labels_from_vbo = vbo_arr[:, 6]  # label column is still index 6
+        # Labels have their own int32 buffer; gpu.vbo aliases positions.
+        labels_from_vbo = np.frombuffer(gpu.label_vbo.read(), dtype=np.int32)
+        assert labels_from_vbo.size == cloud.point_count
         assert (labels_from_vbo == 5).all(), \
             f"labels in VBO: unique={np.unique(labels_from_vbo)}"
+        assert gpu.pos_vbo.read() == positions_before
+        assert gpu.col_vbo.read() == colors_before
+        assert gpu.selected_vbo.read() == selection_before
         print("PASS: re_upload_labels updates GPU buffer")
     finally:
         glfw.terminate()

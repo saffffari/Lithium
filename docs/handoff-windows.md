@@ -66,3 +66,20 @@ Fix what you find (commit with the repo's conventional style), and
 record verification results in this file under a "## Results" heading.
 CI (.github/workflows/release.yml) builds the same artifacts on tag
 push — your local build validates the recipe before the first tag.
+
+## Results — 2026-10-21
+
+- Checked out `main` at `01b560d` on Windows x64; installed Python
+  3.12.13 and `requirements-lock.txt` in an isolated environment.
+- `python -m pytest tests -q`: **220 passed**, including the real
+  OpenGL tests; no skipped tests. Updated the stale GPU-label readback
+  test to use `label_vbo` rather than the position-buffer alias and
+  verify that label edits preserve position, color, and selection data.
+- Native desktop startup verified visually: Contact Sheets renders,
+  fonts and controls are visible, window reports 60 fps, and startup
+  stderr is empty. A timed launch also exited cleanly.
+- The local launcher keeps its fresh library and preferences in a
+  workspace-local profile; existing Linux datasets were not imported.
+- Manual import/paint/restart, cross-monitor DPI, training/inference,
+  and packaged installer validation have not been completed. This is
+  a verified source launch, not an installer build.
