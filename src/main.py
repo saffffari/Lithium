@@ -143,10 +143,14 @@ def _cloud_unit_label(entry) -> str:
 
 class CloudEntry:
     """Represents a loaded cloud with both preview and full-res GPU data."""
-    def __init__(self, file_path: str, file_key: str | None = None):
+    def __init__(self, file_path: str, file_key: str | None = None,
+                 display_name: str | None = None):
         import math as _math
         self.file_path = file_path
-        self.name = os.path.basename(file_path)
+        # CP-9: the catalog's display_name (a rename, or the level-tagged
+        # name set at import) wins over the file basename, which for
+        # consolidated datasets is the same ``cloud.npz`` for every bone.
+        self.name = display_name or os.path.basename(file_path)
         # Link back to the persistent library entry this cloud came from
         # (None for single in-memory loads that predate the library).
         self.file_key: str | None = file_key
@@ -527,6 +531,7 @@ class App:
         # Shift-click extends a range from the last anchor, Ctrl-click
         # toggles individual cells.
         self._gallery_multi_sel: set[int] = set()
+        self._bulk_label_undo = None  # last Contact Sheets label clear
         self._gallery_sel_anchor: int = -1  # last plain-clicked index for shift-range
 
         # Live filter string for the Contact Sheets search bar. Matches
@@ -1655,7 +1660,8 @@ class App:
                 print(f"Skipped duplicate: {existing.name}")
                 continue
 
-            entry = CloudEntry(f, file_key=lib_entry.file_key)
+            entry = CloudEntry(f, file_key=lib_entry.file_key,
+                               display_name=lib_entry.display_name)
             if lib_entry.bounds_min is not None:
                 entry.bounds_min = lib_entry.bounds_min.copy()
                 entry.bounds_max = lib_entry.bounds_max.copy()
@@ -1734,7 +1740,8 @@ class App:
                 existing.file_key = lib_entry.file_key
                 continue
 
-            entry = CloudEntry(f, file_key=lib_entry.file_key)
+            entry = CloudEntry(f, file_key=lib_entry.file_key,
+                               display_name=lib_entry.display_name)
             if lib_entry.bounds_min is not None:
                 entry.bounds_min = lib_entry.bounds_min.copy()
                 entry.bounds_max = lib_entry.bounds_max.copy()
@@ -1827,7 +1834,8 @@ class App:
         self.sequence = None
 
         for lib_entry in target_entries:
-            entry = CloudEntry(lib_entry.file_path, file_key=lib_entry.file_key)
+            entry = CloudEntry(lib_entry.file_path, file_key=lib_entry.file_key,
+                               display_name=lib_entry.display_name)
             if lib_entry.bounds_min is not None:
                 entry.bounds_min = lib_entry.bounds_min.copy()
                 entry.bounds_max = lib_entry.bounds_max.copy()
@@ -3058,9 +3066,13 @@ class App:
         orange = imgui.get_color_u32_rgba(0.95, 0.55, 0.15, 1.0)
         fill = imgui.get_color_u32_rgba(0.95, 0.55, 0.15, 0.15)
 
+        # _drag_*/_lasso_path are window-logical but ImGui draws in
+        # framebuffer space (see ImGuiLayer.new_frame), so convert here
+        # exactly as the hit-test does.
+        to_fb = self._window_to_fb
         if self.active_tool == 'box' and self._drag_start is not None and self._drag_current is not None:
-            x0, y0 = self._drag_start
-            x1, y1 = self._drag_current
+            x0, y0 = to_fb(*self._drag_start)
+            x1, y1 = to_fb(*self._drag_current)
             dl.add_rect_filled(min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1), fill)
             dl.add_rect(min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1),
                         orange, 0.0, 0, s(2.0))
@@ -3070,9 +3082,10 @@ class App:
             # sees the selection envelope as they draw. DPI-scaled so it
             # reads at the same physical width on a 5K display.
             width = s(self.curve_threshold_px) if self.active_tool == 'curve' else s(2.0)
-            for i in range(len(self._lasso_path) - 1):
-                x0, y0 = self._lasso_path[i]
-                x1, y1 = self._lasso_path[i + 1]
+            path = [to_fb(x, y) for x, y in self._lasso_path]
+            for i in range(len(path) - 1):
+                x0, y0 = path[i]
+                x1, y1 = path[i + 1]
                 dl.add_line(x0, y0, x1, y1, curve_color, max(width, s(2.0)))
         elif self.active_tool == 'polygon' and self._lasso_path:
             # Polygon: discrete vertices. Draw committed segments,
@@ -3087,22 +3100,23 @@ class App:
             poly_col = imgui.get_color_u32_rgba(0.20, 0.85, 0.55, 1.0)
             preview_col = imgui.get_color_u32_rgba(0.20, 0.85, 0.55, 0.5)
             line_w = s(2.0)
+            path = [to_fb(x, y) for x, y in self._lasso_path]
             # committed segments
-            for i in range(len(self._lasso_path) - 1):
-                x0, y0 = self._lasso_path[i]
-                x1, y1 = self._lasso_path[i + 1]
+            for i in range(len(path) - 1):
+                x0, y0 = path[i]
+                x1, y1 = path[i + 1]
                 dl.add_line(x0, y0, x1, y1, poly_col, line_w)
             # rubber-band preview line from last vertex to cursor
-            lx, ly = self._lasso_path[-1]
+            lx, ly = path[-1]
             dl.add_line(lx, ly, mx, my, preview_col, line_w)
             # close-the-loop hint from cursor back to the first vertex
             # (fainter, so the user reads the rubber band as primary)
-            if len(self._lasso_path) >= 3:
-                fx, fy = self._lasso_path[0]
+            if len(path) >= 3:
+                fx, fy = path[0]
                 dl.add_line(mx, my, fx, fy, preview_col, line_w * 0.6)
             # vertex handles
             handle_r = s(3.0)
-            for i, (vx, vy) in enumerate(self._lasso_path):
+            for i, (vx, vy) in enumerate(path):
                 r = handle_r * (1.5 if i == 0 else 1.0)
                 dl.add_circle_filled(vx, vy, r, poly_col, 8)
         elif self.active_tool == 'brush':
@@ -4639,6 +4653,8 @@ class App:
 
     def _do_undo(self):
         """Undo the last label command on the selected cloud."""
+        if self.mode == MODE_CONTACT_SHEETS and self._undo_bulk_label_clear():
+            return
         if not (0 <= self.selected_index < len(self.entries)):
             return
         entry = self.entries[self.selected_index]
@@ -5570,6 +5586,162 @@ class App:
         self._after_label_mutation(gpu, cloud)
         return len(indices)
 
+    def _clear_labels_targets(self) -> list[int]:
+        """Entry indices Ctrl+Shift+X / Edit > Clear Labels acts on: the
+        gallery multi-selection in Contact Sheets, else the current cloud."""
+        n = len(self.entries)
+        if self.mode == MODE_CONTACT_SHEETS:
+            multi = sorted(i for i in self._gallery_multi_sel if 0 <= i < n)
+            if multi:
+                return multi
+        return [self.selected_index] if 0 <= self.selected_index < n else []
+
+    def _clear_labels_command(self) -> None:
+        """Ctrl+Shift+X / Edit > Clear Labels: Light Table clears the open
+        cloud as one undo step; Contact Sheets clears every selected cloud."""
+        if self.mode == MODE_LIGHT_TABLE:
+            self._clear_cloud_labels()
+        elif self.mode == MODE_CONTACT_SHEETS:
+            self.clear_labels_for_entries(self._clear_labels_targets())
+
+    def _entry_label_array(self, entry, preview: bool):
+        """Return ``(labels, gpu)`` for one resolution of an entry: the live
+        in-memory array if that GPU cloud is loaded (``gpu`` set), else a
+        copy read from disk (``gpu`` None), else ``(None, None)``."""
+        gpu = entry.preview_gpu if preview else entry.full_gpu
+        if preview and gpu is not None and gpu is entry.full_gpu:
+            gpu = None  # same object as full; handled by the full pass
+        if gpu is not None and gpu.cloud_data is not None and gpu.cloud_data.labels is not None:
+            return gpu.cloud_data.labels, gpu
+        if not entry.file_key:
+            return None, None
+        from src.data.cloud_store import load_preview_labels
+        arr = load_preview_labels(entry.file_key) if preview else load_cloud_labels(entry.file_key)
+        return (None if arr is None else np.array(arr, dtype=np.int32)), None
+
+    def _store_entry_labels(self, entry, preview: bool, arr, gpu) -> None:
+        """Refresh the GPU copy (if loaded) and persist one resolution."""
+        if gpu is not None:
+            gpu.cloud_data.labels_version += 1
+            try:
+                re_upload_labels(gpu, None)
+            except Exception as e:
+                print(f"[clear-labels] re-upload failed: {e}")
+            if hasattr(self, 'label_count_cache'):
+                self.label_count_cache.invalidate_cloud(gpu.cloud_data)
+        if not entry.file_key:
+            return
+        if preview:
+            from src.data.cloud_store import save_preview_labels
+            save_preview_labels(entry.file_key, arr)
+            return
+        err = save_cloud_labels(entry.file_key, arr, catalog=self.catalog)
+        if err:
+            try:
+                self.set_status_banner(
+                    f"Label clear save failed for {entry.name}: {err}",
+                    level="error",
+                    source=f"cloud_store.save_cloud_labels:{entry.file_key}",
+                )
+            except AttributeError:
+                pass
+
+    def clear_labels_for_entries(self, indices: list[int]) -> int:
+        """Reset every labelled point on the given gallery entries to 0,
+        loaded or not, full and preview resolution. Locked labels are kept.
+
+        Label files are snapshotted to ``backups/`` first, and the change
+        is held in ``_bulk_label_undo`` so Ctrl+Z in Contact Sheets puts
+        it back. Returns the number of clouds changed.
+        """
+        entries = [self.entries[i] for i in indices if 0 <= i < len(self.entries)]
+        if not entries:
+            return 0
+        keys = [e.file_key for e in entries if e.file_key]
+        if keys:
+            try:
+                from src.data.cloud_store import snapshot_labels
+                backup_dir, copied, _ = snapshot_labels(keys)
+                print(f"[clear-labels] snapshot of {copied} label files under {backup_dir}")
+            except Exception as e:
+                print(f"[clear-labels] snapshot failed: {e}")
+                try:
+                    self.set_status_banner(
+                        f"Label backup before clear failed: {e}",
+                        level="error", source="clear_labels_for_entries")
+                except AttributeError:
+                    pass
+        records = []
+        for entry in entries:
+            changes = {}
+            for preview in (False, True):
+                arr, gpu = self._entry_label_array(entry, preview)
+                if arr is None or arr.size == 0:
+                    continue
+                idx = np.flatnonzero((arr != 0) & ~locked_mask(arr, self.label_registry))
+                if len(idx) == 0:
+                    continue
+                changes[preview] = (idx, arr[idx].copy())
+                arr[idx] = 0
+                self._store_entry_labels(entry, preview, arr, gpu)
+            if changes:
+                entry.mesh_dirty = True
+                records.append((entry, changes))
+        if not records:
+            print("Selected clouds already unlabeled")
+            return 0
+        # Per-cloud undo entries now point at labels that no longer exist.
+        if any(e is self.entries[self.selected_index] for e, _ in records
+               if 0 <= self.selected_index < len(self.entries)):
+            self.undo_stack.clear()
+        self._bulk_label_undo = records
+        self._snapshot_dirty = True
+        msg = (f"Cleared labels on {len(records)} cloud"
+               f"{'s' if len(records) != 1 else ''} (Ctrl+Z in Contact Sheets to undo)")
+        print(msg)
+        if self.cli:
+            self.cli.log(msg, "ok")
+        return len(records)
+
+    def _undo_bulk_label_clear(self) -> bool:
+        """Restore the last ``clear_labels_for_entries``. True if it ran."""
+        records = getattr(self, '_bulk_label_undo', None)
+        if not records:
+            return False
+        self._bulk_label_undo = None
+        for entry, changes in records:
+            for preview, (idx, old) in changes.items():
+                arr, gpu = self._entry_label_array(entry, preview)
+                if arr is None or arr.size <= int(idx.max()):
+                    continue
+                arr[idx] = old
+                self._store_entry_labels(entry, preview, arr, gpu)
+            entry.mesh_dirty = True
+        msg = f"Restored labels on {len(records)} cloud{'s' if len(records) != 1 else ''}"
+        print(msg)
+        if self.cli:
+            self.cli.log(msg, "ok")
+        return True
+
+    def _clear_cloud_labels(self) -> int:
+        """Ctrl+Shift+X: reset every labelled point on the current cloud to
+        unlabeled (0) as one undoable command. Locked labels are kept."""
+        if self.mode != MODE_LIGHT_TABLE:
+            return 0
+        gpu = self._current_gpu_cloud()
+        if gpu is None:
+            return 0
+        cloud = gpu.cloud_data
+        indices = self._drop_locked(np.flatnonzero(cloud.labels != 0))
+        if len(indices) == 0:
+            print("Cloud already unlabeled")
+            return 0
+        apply_label(cloud, indices, 0, self.undo_stack,
+                    description=f"Clear {len(indices)} pts to unlabeled")
+        self._after_label_mutation(gpu, cloud)
+        print(f"Cleared {len(indices):,} points to unlabeled (Ctrl+Z to undo)")
+        return len(indices)
+
     def _window_to_fb(self, mx: float, my: float) -> tuple[float, float]:
         """Convert GLFW *window* (logical) cursor coords to *framebuffer*
         (physical) pixels.
@@ -6340,10 +6512,10 @@ class App:
                 self._tool_engaged = True
                 # Stamp the erase flag for the entire stroke.
                 self._drag_ctrl = ctrl
-                # NOTE: _drag_*/_lasso_path stay in window-logical pixels so
-                # the ImGui overlay (which draws in logical space) stays
-                # correct. Conversion to framebuffer space happens only at
-                # hit-test time (_do_*, _finish_*) via _window_to_fb.
+                # NOTE: _drag_*/_lasso_path stay in window-logical pixels
+                # (raw GLFW cursor coords). Both consumers convert via
+                # _window_to_fb: the hit-test (_do_*, _finish_*) and the
+                # ImGui overlay, which draws in framebuffer space.
                 if self.active_tool == 'pick':
                     self._do_pick(mx, my, False, ctrl)
                 elif self.active_tool == 'box':
@@ -6723,8 +6895,8 @@ class App:
         # brush etc. — LIGHT TABLE only, those tools don't exist in
         # HOLOGRAM).
         if self.mode == MODE_LIGHT_TABLE and self.active_tool is not None:
-            # _drag_*/_lasso_path stay in window-logical pixels (the ImGui
-            # overlay draws in that space); the brush hit-tests immediately
+            # _drag_*/_lasso_path stay in window-logical pixels (converted
+            # by both the overlay and the hit-test); the brush hit-tests immediately
             # so it converts at the call (_do_brush_at -> _window_to_fb).
             if self.active_tool == 'box' and self._drag_start is not None:
                 self._drag_current = (x, y)
@@ -7120,6 +7292,8 @@ class App:
                 self._toggle_tool('box')
         elif key == glfw.KEY_G and (mods & glfw.MOD_SHIFT):
             self.show_grid = not self.show_grid
+        elif key == glfw.KEY_X and (mods & glfw.MOD_CONTROL) and (mods & glfw.MOD_SHIFT):
+            self._clear_labels_command()
         elif key == glfw.KEY_Z and (mods & glfw.MOD_CONTROL) and (mods & glfw.MOD_SHIFT):
             # Ctrl+Shift+Z = redo. Must come before the plain Ctrl+Z
             # branch below so the shift modifier isn't swallowed by undo.

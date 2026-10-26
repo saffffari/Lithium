@@ -56,6 +56,7 @@ SHORTCUTS = [
         ("Ctrl + scroll", "Adjust brush radius / depth limit"),
         ("Enter", "Apply active label"),
         ("Ctrl+Z / Ctrl+Shift+Z", "Undo / Redo"),
+        ("Ctrl+Shift+X", "Clear labels (cloud, or selected sheets)"),
         ("Ctrl/Cmd + / - / 0", "UI scale up / down / reset"),
         ("L", "Toggle label color view"),
     ]),
