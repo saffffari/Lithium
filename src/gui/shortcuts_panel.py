@@ -17,8 +17,8 @@ from src.gui.theme import *
 # wall next to the machine.
 GETTING_STARTED = [
     ("1.", "CONTACT SHEETS: double-click a bone to open it"),
-    ("2.", "LIGHT TABLE: Choose a label, then P / O / K to paint"),
-    ("3.", "G cycles labels; tools paint immediately"),
+    ("2.", "LIGHT TABLE: Choose a label and a tool (P / O / K)"),
+    ("3.", "Shift+drag paints, Ctrl+drag erases; G cycles labels"),
     ("4.", "Thumb wheel or LEFT / RIGHT: next bone (autosaves)"),
     ("5.", "Mistake? Ctrl+Z. Lost? F focuses the view"),
 ]
@@ -30,10 +30,12 @@ SHORTCUTS = [
         ("MMB drag", "Pan camera"),
         ("Scroll", "Zoom (dolly-under-cursor)"),
         ("Thumb wheel", "Previous / next cloud"),
-        ("Alt + LMB", "Sample point label (Points view)"),
+        ("Alt + LMB", "Place 3D cursor (no zoom)"),
         ("MMB + scroll", "Adjust point size"),
         ("LMB double-click", "Place 3D cursor + focus"),
-        ("LMB drag", "Reserved for selection tools"),
+        ("LMB drag", "Pan camera"),
+        ("Shift + LMB drag", "Paint with the active tool"),
+        ("Ctrl + LMB drag", "Erase the active label"),
     ]),
     ("NAVIGATION", [
         ("1 / 2 / 3", "Switch tab (Sheets / Light Table / Train)"),
@@ -51,8 +53,8 @@ SHORTCUTS = [
         ("O", "Lasso tool"),
         ("K", "Brush tool"),
         ("U", "Curve tool"),
-        ("Shift + click", "Add to selection"),
-        ("Ctrl + click", "Remove from selection"),
+        ("Shift + click", "Paint (Pick tool)"),
+        ("Ctrl + click", "Erase (Pick tool)"),
         ("Ctrl + scroll", "Adjust brush radius / depth limit"),
         ("Shift+H", "Toggle GUI visibility"),
         ("Ctrl+Z / Ctrl+Shift+Z", "Undo / Redo"),

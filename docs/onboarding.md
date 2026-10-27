@@ -10,8 +10,8 @@ and send a small bundle of labels back.
 You need Git. On Windows, [GitHub Desktop](https://desktop.github.com)
 is the simplest way to clone; on macOS/Linux use `git` in a terminal.
 
-1. Clone the repository you were given access to
-   (`github.com/saffffari/Lithium`) to a folder of your choice.
+1. Clone `https://github.com/saffffari/Lithium` to a folder of your
+   choice.
 2. Open a terminal in that folder and run the setup script. It
    installs a private Python, the packages and launches the app:
 
@@ -23,8 +23,8 @@ is the simplest way to clone; on macOS/Linux use `git` in a terminal.
    After the first time, start Lithium with `run.bat` (Windows) or
    `./run.sh`.
 
-The app needs an OpenGL 4.3 GPU — any laptop from the last ten years
-with up-to-date graphics drivers is fine. No NVIDIA card is required.
+The app needs an OpenGL 4.1 GPU — most laptops from the last ten years
+with up-to-date graphics drivers are fine. No NVIDIA card is required.
 
 ## 2. Load the project
 
@@ -39,14 +39,16 @@ Press `?` inside the app for the shortcut card; its GETTING STARTED
 block is the whole loop:
 
 1. Double-click a bone tile to open it in the LIGHT TABLE.
-2. Select points with the box (`B`), lasso (`O`) or brush (`K`).
-3. `G` cycles the active label; `Enter` applies it to the selection.
-4. Thumb wheel or `LEFT`/`RIGHT` moves to the next bone. Labels save
-   themselves.
-5. `Ctrl+Z` undoes. `SPACE` refits the view if you get lost.
+2. Click a label (or press `G` to cycle through them).
+3. Pick a tool: pick (`P`), lasso (`O`), brush (`K`), or box from the
+   toolbar. **Hold Shift and drag** to paint the label; hold Ctrl to
+   erase it. A plain left drag pans the view.
+4. Thumb wheel, `LEFT`/`RIGHT` or `B`/`V` moves between bones. Labels
+   save themselves.
+5. `Ctrl+Z` undoes. `F` refits the view if you get lost.
 
 Your labelling protocol (which structures, which bones, in which
-order) comes separately from Alex. Follow it exactly: the study
+order) comes separately from the study lead. Follow it exactly: the study
 compares your labels with other readers', so consistency matters more
 than speed.
 
@@ -54,9 +56,9 @@ than speed.
 
 **File > Export Project (.li)...**, tick **Labels** only, save the
 file (a few MB) and drop it in the shared Drive folder with your name
-and the date in the filename, e.g. `kevin_2026-11-03_labels.li`.
-Importing it on our side merges your labels into the source project
-as their own layer.
+and the date in the filename, e.g. `yourname_2026-11-03_labels.li`.
+Importing it on our side keeps your labels as their own project, separate
+from every other reader's.
 
 ## If something breaks
 

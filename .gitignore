@@ -85,17 +85,29 @@ node_modules/
 /_smoke_output/
 /_preview/
 
-# Manuscript build artefacts (paper/): keep sources, figures, tables, main.bbl
-/paper/main.aux
-/paper/main.log
-/paper/main.out
-/paper/main.blg
-/paper/main.pdf
-/paper/pages/
-/paper/pages2/
-/paper/arxiv/
-/paper/arxiv_verify/
-/paper/lithium_arxiv.tar.gz
+# Project bundles, catalogs and medical/volume data never belong in git.
+*.li
+*.npz
+*.npy
+*.h5
+*.hdf5
+*.nii
+*.nii.gz
+*.dcm
+*.mha
+*.nrrd
+*.glb
+*.zip
+.lithium/
 
-# Built pitch page (regenerate with scripts/pitch_build.py; published as an Artifact)
-/docs/pitch/lithium_pitch.html
+# Test and tool caches
+.pytest_cache/
+
+# Local handoff deliverables (kept beside the checkout, never committed)
+/outputs/
+/handoff-support/
+/review-profile/
+/HANDOFF.txt
+/HANDOFF-MANIFEST.json
+/Launch Lithium.cmd
+/Launch Kevin Review.cmd

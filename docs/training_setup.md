@@ -255,8 +255,7 @@ Once the env is set up, the normal flow is:
 
 ## Required launch parameters (regression-prone)
 
-Per `project_ptv3_training_realities` memory and the wave-2 audit
-(`_audit/REPORT.md` Theme 5):
+These have each broken a run before:
 
 - **`pointcept_ext_dir`** must be passed to `PointceptLaunchConfig`. If
   omitted, `_build_command` at `ptv3_runner.py:458` skips the

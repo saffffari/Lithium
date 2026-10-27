@@ -19,14 +19,14 @@ If `pyopengl-accelerate` refuses to build, drop it: `uv pip install -p .venv/bin
 --no-deps pyopengl` is enough — it is an optional speed-up.
 
 Open a bone directly: `./run.sh path/to/vertebra.ply`. Open a project:
-`./run.sh --project "Deepfield · Gold247 · 6-class [LOCKED]" --cloud 3 --tab light`.
+`./run.sh --project "My project" --cloud 3 --tab light`.
 
 ## Bring the catalog over
 
 The catalog is a directory. From the Linux workstation, with SSH to the Mac working:
 
 ```bash
-rsync -a --info=progress2 ~/.lithium/ sprinta:~/.lithium/      # ~2 GB
+rsync -a --info=progress2 ~/.lithium/ my-mac:~/.lithium/       # ~2 GB
 ```
 
 Model checkpoints referenced by the registry live on the workstation; on the Mac
