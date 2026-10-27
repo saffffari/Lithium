@@ -4,6 +4,8 @@ import os
 import re
 import shlex
 
+import numpy as np
+
 from src.core.modes import (
     MODE_CONTACT_SHEETS, MODE_LIGHT_TABLE, MODE_AUTOMATION,
 )

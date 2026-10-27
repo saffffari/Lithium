@@ -4675,6 +4675,8 @@ class App:
             self.fps = self._fps_frame_count / elapsed
             self._total_point_count = sum(e.point_count for e in self.entries)
             pts = self._total_point_count
+            mode_names = {MODE_CONTACT_SHEETS: "Contact Sheets", MODE_LIGHT_TABLE: "Light Table", MODE_AUTOMATION: "Train"}
+            mode_str = mode_names.get(self.mode, "View")
             pending = self.catalog.pending_count if self.catalog else 0
             pending_str = f" | {pending} loading" if pending > 0 else ""
             glfw.set_window_title(
