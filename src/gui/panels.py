@@ -154,6 +154,14 @@ def draw_main_menu_bar(app) -> float:
             if imgui.menu_item("Redo", "Ctrl+Shift+Z", False, True)[0]:
                 app._do_redo()
             imgui.separator()
+            _n_clear = len(app._clear_labels_targets())
+            _clear_lbl = ("Clear Labels" if _n_clear <= 1
+                          or app.mode != MODE_CONTACT_SHEETS
+                          else f"Clear Labels ({_n_clear} clouds)")
+            if imgui.menu_item(_clear_lbl, "Ctrl+Shift+X", False,
+                               _n_clear > 0 and app.mode in (
+                                   MODE_LIGHT_TABLE, MODE_CONTACT_SHEETS))[0]:
+                app._clear_labels_command()
             if imgui.menu_item("Clear 3D Cursor + Fit", "", False, True)[0]:
                 app.cursor3d.clear()
                 app._fit_camera()
@@ -1047,7 +1055,7 @@ def _draw_library_panel(app):
     # Divider before user projects
     if catalog.projects:
         imgui.dummy(1, s(4))
-    for col in sorted(catalog.user_projects(), key=lambda p: p.name.lower()):
+    for col in catalog.user_projects_recent():
         cid = col.id
         _library_row(app, col.name, len(col.file_keys), OP1_GREEN,
                      ("project", cid), indent=th * 0.6,
@@ -3887,6 +3895,12 @@ def _draw_gallery_ctx_popup(app):
             elif not user_cols:
                 # Grey-disabled row when there are no user projects yet
                 imgui.menu_item(add_label, "", False, False)
+
+            _clr = (f"Clear labels on {len(targets)} clouds"
+                    if len(targets) > 1 else "Clear labels")
+            if imgui.menu_item(_clr, "Ctrl+Shift+X")[0]:
+                app.clear_labels_for_entries(targets)
+                imgui.close_current_popup()
 
             if imgui.menu_item("Rename...", "",
                                False, len(targets) == 1)[0]:

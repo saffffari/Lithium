@@ -122,7 +122,7 @@ def _projects(app):
     cat = getattr(app, "catalog", None)
     if cat is None:
         return []
-    return sorted(cat.user_projects(), key=lambda p: p.name.lower())
+    return cat.user_projects_recent()
 
 
 # ---------------------------------------------------------------------------

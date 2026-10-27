@@ -1,6 +1,7 @@
 """Automation CLI engine for Lithium — interactive command interface."""
 
 import os
+import re
 import shlex
 
 from src.core.modes import (
@@ -334,7 +335,13 @@ class CLIEngine:
             self.app._ensure_full_resolution(i)
             if entry.bounds_min is not None:
                 self.app.camera.fit_to_bounds(entry.bounds_min, entry.bounds_max)
-            name = os.path.splitext(entry.name)[0]
+            # Display names can carry spaces and '|' (e.g. "L4 THIN | ...");
+            # keep the PNG filename portable.
+            name = entry.name
+            ext = os.path.splitext(entry.file_path)[1]
+            if ext and name.endswith(ext):
+                name = name[:-len(ext)]
+            name = re.sub(r'[^\w.-]+', '_', name).strip('_')
             out_path = os.path.join(output_dir, f"{name}.png")
             try:
                 from src.export.image_export import export_still

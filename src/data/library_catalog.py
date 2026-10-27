@@ -952,6 +952,11 @@ class LibraryCatalog:
         """Every project except the SANDBOX pseudo-project."""
         return [p for pid, p in self.projects.items() if pid != SANDBOX_PROJECT_ID]
 
+    def user_projects_recent(self) -> list["Project"]:
+        """``user_projects`` newest first (by creation time), name as tiebreak."""
+        return sorted(self.user_projects(),
+                      key=lambda p: (-float(p.created or 0.0), p.name.lower()))
+
     def delete_project(self, project_id: str) -> None:
         if project_id == SANDBOX_PROJECT_ID:
             return  # the sandbox always exists; its layers are cloud-level

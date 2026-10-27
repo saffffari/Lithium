@@ -1,0 +1,15 @@
+# Lithium for annotators: the viewer / labeller only.
+# No PyInstaller, no GLB conversion tools, no training stack.
+# Pins match requirements-lock.txt.
+moderngl==5.12.0
+glfw==2.10.1
+imgui==2.0.0
+pyopengl==3.1.10
+pyopengl-accelerate==3.1.10
+numpy==2.5.1
+scipy==1.18.0
+pillow==12.3.0
+plyfile==1.1.4
+laspy==2.7.0
+lazrs==0.8.1
+h5py==3.16.0
