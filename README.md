@@ -6,6 +6,7 @@ training segmentation models on the result. It runs offline: no account, no
 upload.
 
 ![Lithium's Light Table: a vertebra with its surfaces labelled](docs/images/light-table.png)
+<sub>Vertebra from the public [VerSe](https://github.com/anjany/verse) dataset (CC BY-SA 4.0).</sub>
 
 ## What it does
 
