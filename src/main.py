@@ -411,8 +411,8 @@ class App:
         self._register_default_event_handlers_pending = True
 
         # Generic subprocess→main-thread event queue (Pattern A).
-        # Every subprocess reader thread (PolyPose, ImagingRunner,
-        # ContactSheetsInferRunner, PT-v3, ...) is supposed to call
+        # Every subprocess reader thread (ContactSheetsInferRunner,
+        # PT-v3, ...) is supposed to call
         # ``app.post_event(kind, payload)`` instead of mutating App
         # state directly. The main loop drains all queues each frame in
         # ``drain_all_events`` and dispatches to a registered handler
@@ -593,8 +593,8 @@ class App:
         # of the old behaviour where a stray RMB nuked the project.
         self._project_ctx_target: str = ""
         # Restore Light Table view settings from prefs
-        # User mode: 'researcher' (default, all 6 tabs) or 'clinician'
-        # (Imaging / Hologram / Overwatch only). Persisted across sessions.
+        # Legacy user-mode pref ('researcher' default). Persisted across
+        # sessions so older prefs files still load.
         self.user_mode: str = str(prefs.get("user_mode", "researcher"))
         # User UI-scale multiplier on top of the monitor's content scale
         # (Ctrl/Cmd + '+' / '-' / '0'). Persisted; applied through the same
@@ -6234,10 +6234,8 @@ class App:
 
         Returns the world-space position under the cursor using the
         correct picker for the active mode:
-          - HOLOGRAM → multi-cloud picker (every visible vertebra at
-            its reference-local pose).
-          - everything else → single-cloud picker against the active
-            entry's ``model_transform``.
+          - single-cloud picker against the active entry's
+            ``model_transform``.
 
         Callers that need the hit cloud's entry (e.g. for focus
         framing) should reach for the underlying picker directly; this
@@ -6254,9 +6252,6 @@ class App:
 
         - **LIGHT TABLE**: per-entry ``model_transform`` (single-cloud
           view, no reference-anchoring).
-        - **HOLOGRAM**: ``reference_local_model(cloud_pose, ref_pose)``
-          — the same matrix the renderer uses — so anchors follow
-          their bones through reference-vertebra switches.
         - Other modes: identity (the gallery / contact sheets don't
           render the measure registry, so the resolver mostly returns
           None for missing clouds; the few anchors that exist resolve

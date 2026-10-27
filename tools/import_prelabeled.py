@@ -1,11 +1,10 @@
 #!/usr/bin/env python
 """Bulk-import prelabeled point clouds into a Lithium catalog project.
 
-Built for the incoming 64k-point / ~15k-cloud Sonata-labelled cohort
-coming down from the HPC, but generic: any directory of clouds that
-already carry per-point class ids becomes a project whose labels are
-the *editable starting labels*, with the model that produced them
-attached so INFER keeps working in that project.
+Any directory of clouds that already carry per-point class ids becomes
+a project whose labels are the *editable starting labels*, optionally
+with the model that produced them attached so INFER keeps working in
+that project.
 
 Accepted inputs (auto-detected per file, mixed is fine):
   *.ply            'label' (or segment/class/pred/scalar_label) vertex field
@@ -13,19 +12,17 @@ Accepted inputs (auto-detected per file, mixed is fine):
   <scene>/coord.npy + color.npy + segment.npy|pred.npy   (Pointcept layout)
 
 Ontology: ``--ontology-from`` copies an existing project's classes +
-palette (default: the Sonata Validation project, so colours match), or
-``--classes`` takes a classes.json (``{"class_names": [...]}``) / a
+palette, or ``--classes`` takes a classes.json (``{"class_names": [...]}``) / a
 comma list. Class ids in the files must index that list (0 = Unlabeled).
 
 Idempotent + additive: clouds are content-hashed (re-runs dedupe), the
 project is reused by name, existing clouds/labels are never rewritten
-unless ``--force-labels``. One index/projects save at the end — 15k
-registrations do NOT rewrite index.json 15k times.
+unless ``--force-labels``. One index/projects save at the end, so
+large imports do NOT rewrite index.json once per cloud.
 
 Run with the app CLOSED (single-instance catalog):
-    ~/Lithium/.venv/bin/python tools/import_prelabeled.py \
-        --src /board_rack/Lithium/datasets/incoming/<cohort> \
-        --project "Deepfield · 64k Sonata · 15k" --region spine --dry-run
+    python tools/import_prelabeled.py --src /path/to/clouds \
+        --project "My prelabelled set" --classes full6 --dry-run
 """
 from __future__ import annotations
 
@@ -52,8 +49,6 @@ from src.data.point_cloud import PointCloudData  # noqa: E402
 from src.utils.file_hash import compute_file_key  # noqa: E402
 
 LABEL_FIELDS = ("label", "labels", "segment", "class", "pred", "scalar_label")
-DEFAULT_ONTOLOGY_PROJECT = "Deepfield · Validation · Sonata (val 38)"
-DEFAULT_CHECKPOINT = REPO / "training/runs/sonata_full6_gold247_v1/model/model_best.pth"
 FULL6 = ["Unlabeled", "Superior_Endplate", "Inferior_Endplate", "Pedicle",
          "Body_Wall", "Spinous_Process"]
 
@@ -236,18 +231,18 @@ def main() -> int:
     ap.add_argument("--project", required=True, help="project name (reused if it exists)")
     ap.add_argument("--pattern", default=None, help="glob (e.g. '*.ply'); default: ply+npz+scene dirs")
     ap.add_argument("--label-field", default=None, help="force the per-point label field name")
-    ap.add_argument("--ontology-from", default=DEFAULT_ONTOLOGY_PROJECT,
+    ap.add_argument("--ontology-from", default=None,
                     help="copy classes + palette from this project (name or id)")
     ap.add_argument("--classes", default=None,
                     help="instead: classes.json, 'sonata6', or 'Unlabeled,A,B,...'")
     ap.add_argument("--region", default="spine")
-    ap.add_argument("--checkpoint", type=Path, default=DEFAULT_CHECKPOINT,
+    ap.add_argument("--checkpoint", type=Path, default=None,
                     help="model that produced the labels; attached for INFER (''=none)")
     ap.add_argument("--config", type=Path, default=None, help="run config next to the checkpoint")
-    ap.add_argument("--model-name", default="Sonata full6 Gold247 v1 (ep112)")
-    ap.add_argument("--arch", default="PT-v3m2 (Sonata)")
-    ap.add_argument("--best-miou", type=float, default=0.8139)
-    ap.add_argument("--skip-sha", action="store_true", help="skip hashing the 1.5 GB checkpoint")
+    ap.add_argument("--model-name", default="Imported model")
+    ap.add_argument("--arch", default="PT-v3")
+    ap.add_argument("--best-miou", type=float, default=0.0)
+    ap.add_argument("--skip-sha", action="store_true", help="skip hashing the checkpoint")
     ap.add_argument("--limit", type=int, default=0, help="import only the first N (smoke test)")
     ap.add_argument("--force-labels", action="store_true", help="rewrite labels of known clouds")
     ap.add_argument("--dry-run", action="store_true")
@@ -269,8 +264,10 @@ def main() -> int:
     cat = LibraryCatalog()
     if a.classes:
         ontology, names = ontology_from_names(load_class_names(a.classes))
-    else:
+    elif a.ontology_from:
         ontology, names = ontology_from_project(cat, a.ontology_from)
+    else:
+        raise SystemExit("pass --classes or --ontology-from")
     print(f"classes : {names}")
 
     project = next((p for p in cat.projects.values() if p.name == a.project), None)

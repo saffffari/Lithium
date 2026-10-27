@@ -70,7 +70,7 @@ def test_scan_recursive_mixed_extensions():
         _touch(os.path.join(tmp, "a", "3.laz"))
         _touch(os.path.join(tmp, "a", "4.npz"))
         _touch(os.path.join(tmp, "a", "5.txt"))
-        # .tif / .nii.gz medical-volume loaders left with the SpineLab cut;
+        # .tif / .nii.gz medical-volume loaders were removed;
         # the research build supports only point-cloud extensions now.
         _touch(os.path.join(tmp, "b", "6.tif"))
         _touch(os.path.join(tmp, "b", "7.nii.gz"))

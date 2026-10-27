@@ -15,7 +15,8 @@ import shutil
 import traceback
 
 # Need Lithium on sys.path so we can import our generator
-sys.path.insert(0, r"D:\Lithium")
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, REPO)
 
 import numpy as np
 
@@ -25,8 +26,8 @@ from src.export.dataset_export import export_dataset
 from src.training.config_gen import PTv3TrainParams, generate_ptv3_config
 
 
-POINTCEPT_DIR = r"D:\Lithium\training\pointcept"
-EXT_DIR = r"D:\Lithium\src\training\pointcept_ext"
+POINTCEPT_DIR = os.path.join(REPO, "training", "pointcept")
+EXT_DIR = os.path.join(REPO, "src", "training", "pointcept_ext")
 
 
 def make_tiny_export(root: str):

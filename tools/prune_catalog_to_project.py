@@ -16,21 +16,21 @@ successful end-to-end run.
 Usage::
 
     # Dry run first — shows what would be removed without touching anything.
-    python tools/prune_catalog_to_project.py --project spinelab_4class --dry-run
+    python tools/prune_catalog_to_project.py --project my_project --dry-run
 
     # Real run — backs up to ~/.lithium/backups/ then prunes.
-    python tools/prune_catalog_to_project.py --project spinelab_4class
+    python tools/prune_catalog_to_project.py --project my_project
 
     # Keep multiple projects:
     python tools/prune_catalog_to_project.py \\
-        --project spinelab_4class --project spinelab_vertebral_subregions
+        --project my_project --project other_project
 
 Project may be either the literal project id (``proj:abc123ef``) or
 the human-readable name. Names get fuzzy-matched against
 ``projects.json`` so a typo with the wrong case still resolves.
 
-Out of scope: this script does NOT touch ``D:\\Lithium\\dataset\\
-training_runs\\`` — the trained model checkpoints live there, and the
+Out of scope: this script does NOT touch the training-run
+directories — the trained model checkpoints live there, and the
 model registry just stores absolute paths to them. After pruning,
 those checkpoints stay reachable for inference / fine-tune. If you
 also want to clean up training_runs directories that no project

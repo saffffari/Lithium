@@ -1,8 +1,7 @@
 """Mesh GPU representation and rendering.
 
 Parallels point_cloud_renderer.py for the triangulated surface display
-mode used in HOLOGRAM (clinician-facing) and optionally in LIGHT TABLE
-(researcher). Each mesh uploads three VBOs (position / normal / label)
+mode, optional in LIGHT TABLE. Each mesh uploads three VBOs (position / normal / label)
 + one index buffer, all written once at upload and never re-written
 during normal interaction (label edits trigger a full rebuild via the
 cloud_store mesh cache rather than partial updates — meshes aren't
@@ -239,9 +238,9 @@ def draw_mesh(
 ) -> None:
     """Render a single uploaded mesh into the bound FBO.
 
-    ``tint`` multiplies the surface colour so dual-pose HOLOGRAM renders
-    can distinguish supine (default ``(1, 1, 1)``) from standing (e.g.
-    ``(0.55, 0.75, 1.2)`` for a blue tint). Applied to the SURFACE
+    ``tint`` multiplies the surface colour (default ``(1, 1, 1)``) so
+    overlaid meshes can be told apart (e.g. ``(0.55, 0.75, 1.2)`` for a
+    blue tint). Applied to the SURFACE
     colour before Lambert shading so curvature still reads correctly
     — not a post-multiply on the lit colour, which would wash out
     the directional shading.

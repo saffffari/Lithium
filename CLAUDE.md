@@ -4,7 +4,7 @@
 
 Lithium is a custom desktop point cloud visualizer, annotator, and renderer. High-performance, GPU-accelerated, workstation-grade. Packaged as a standalone executable. Three modes carry the research workflow: **CONTACT_SHEETS** (browse a per-cloud gallery), **LIGHT_TABLE** (paint / refine per-point labels), **AUTOMATION / TRAIN** (stage datasets + train Pointcept PT-v3 models).
 
-> The clinical product surface (**SpineLab** — IMAGING / HOLOGRAM / OVERWATCH, CT ingest, PolyPose registration, clinical measurement analytics) was split out into its own repository. Don't reintroduce imaging / registration / clinical-measurement code here.
+> Lithium is a point-cloud tool. Medical-imaging, registration and clinical-measurement code does not belong in this repository.
 
 ## Orientation for a new session
 
@@ -121,7 +121,7 @@ data/                    — point cloud data (gitignored)
 - **mm units everywhere** — point cloud coordinates are in mm; Pointcept `grid_size=0.5 mm` at `src/training/config_gen.py` (the upstream default of 0.001 m fails the depth ≤ 16 assertion on small objects).
 - **`batch_size=2`** for PT-v3 — fits VRAM.
 - **`extent / grid_size < 65536`** or Pointcept depth assertion fails.
-- **3 modes** — CONTACT_SHEETS / LIGHT_TABLE / AUTOMATION. Mode integer values are 1 / 2 / 5 (preserved from the historical six-mode layout so persisted settings stay valid); the retired 0/3/4 indices left with SpineLab and are not reused. New features go into an existing mode unless they genuinely don't fit.
+- **3 modes** — CONTACT_SHEETS / LIGHT_TABLE / AUTOMATION. Mode integer values are 1 / 2 / 5 (preserved from the historical six-mode layout so persisted settings stay valid); the retired 0/3/4 indices are not reused. New features go into an existing mode unless they genuinely don't fit.
 - **Single-instance lock** at `~/.lithium/library/.lock` — App refuses to start if another live instance owns it. Override the library dir with `LITHIUM_LIBRARY_DIR`.
 - **The catalog *is* the dataset** — once a cloud is imported, its labels live under `~/.lithium/library/labels/<namespace>/<file_key>.npy` forever. There is no separate "save project" step.
 - **Labels are namespaced per project (v2, 1.1)** — the namespace is a project id (or `_library` for non-project views). A cloud in N projects has N independent label arrays; painting in one never touches another. `cloud_store.set_active_label_namespace` is set by `App.set_active_view`; background workers freeze the namespace at submit. A 1.0 flat `labels/` tree migrates automatically on first catalog init (`migrate_labels_layout_v2`, marker-gated, non-destructive).

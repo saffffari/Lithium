@@ -109,7 +109,7 @@ AXIS_Z = TEAL
 # SEMANTIC — Phase 13 token-drift consolidation (added Phase 4 Batch 10)
 # ─────────────────────────────────────────────────────────────────────
 # These tokens consolidate the raw RGBA tuples that crept into panels
-# during the SpineLab build-out. Port sites land in Phase 13 — adding
+# during earlier build-outs. Port sites land in Phase 13 — adding
 # the names here first so the migration commits can stay focused on
 # "replace this tuple with this token" diffs.
 

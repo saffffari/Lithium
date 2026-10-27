@@ -7,11 +7,8 @@ maps under `_audit/`. If you're a human, start with `README.md` and
 `CLAUDE.md`; this file assumes you can navigate Python + Markdown
 without preamble.
 
-> The clinical product surface (**SpineLab** — IMAGING / HOLOGRAM /
-> OVERWATCH, CT ingest, PolyPose registration, clinical measurement
-> analytics) was split out into its own repository. This repo is
-> Lithium only. Don't reintroduce imaging / registration / clinical
-> code here.
+> Lithium is a point-cloud tool. Medical-imaging, registration and
+> clinical-measurement code does not belong in this repository.
 
 ---
 

@@ -4,11 +4,11 @@
 Same code path as File > Export Project / Import Project, minus the
 window — for building hand-off kits and for scripted round trips.
 
-    python tools/bundle_cli.py export "SPITFIRE v2 · review (2026-10-13)" \
-        --out /tmp/spitfire_clouds.li --clouds            # clouds only (blinded)
-    python tools/bundle_cli.py export proj:33e127f2 --out x.li --clouds --labels --models
+    python tools/bundle_cli.py export "My project" \
+        --out /tmp/my_clouds.li --clouds                  # clouds only (blinded)
+    python tools/bundle_cli.py export proj:1a2b3c4d --out x.li --clouds --labels --models
     python tools/bundle_cli.py inspect x.li
-    python tools/bundle_cli.py import x.li [--name "Kevin · reader"] [--into proj:...] [--overwrite-labels]
+    python tools/bundle_cli.py import x.li [--name "Reader 1"] [--into proj:...] [--overwrite-labels]
 
 Close Lithium first (single-instance catalog lock) when importing.
 Set LITHIUM_LIBRARY_DIR to target a catalog other than ~/.lithium/library.

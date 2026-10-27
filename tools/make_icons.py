@@ -15,7 +15,7 @@ import math
 import subprocess
 from pathlib import Path
 
-OUT = Path("/home/alex/icons/out/Lithium")
+OUT = Path(__file__).resolve().parents[1] / "build" / "icons"
 OUT.mkdir(parents=True, exist_ok=True)
 
 BG = "#0B0B0C"

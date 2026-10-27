@@ -10,15 +10,13 @@ Anchors live in **cloud-local** space: each anchor stores the
 ``file_key`` of the cloud it was placed on plus a 3-vector in that
 cloud's mesh-local frame. To get its current world position, callers
 pass a resolver callable that knows how to transform local → world
-using the current scene state (in HOLOGRAM the model matrix composes
-``reference_local_model(cloud_pose, ref_pose)``; in LIGHT TABLE it
-composes the entry's ``model_transform``).
+using the current scene state (in LIGHT TABLE it composes the entry's
+``model_transform``).
 
 The cloud-local representation is what makes measurements survive
-reference-vertebra switches in HOLOGRAM — when the user re-anchors
-the scene to a different bone, every other bone's world transform
-changes, but the per-bone local frames don't. World-space anchors
-detach from their bones in that scenario; cloud-local anchors follow.
+transform changes — when a cloud's world transform changes, its local
+frame doesn't. World-space anchors would detach from their clouds in
+that scenario; cloud-local anchors follow.
 
 Usage::
 
@@ -89,10 +87,9 @@ def make_resolver(entries_by_key: dict, model_of: Callable | None = None):
     ``entries_by_key`` is ``{file_key: entry}`` for every cloud
     currently in scene. ``model_of(entry) -> np.ndarray(4,4)`` returns
     the entry's current model matrix; when None we fall back to
-    ``entry.model_transform`` (LIGHT TABLE convention). The
-    HOLOGRAM render path supplies an explicit ``model_of`` because the
-    HOLOGRAM scene composes a reference-local matrix that lives only
-    in the render loop, not on the entry.
+    ``entry.model_transform`` (LIGHT TABLE convention). A render path
+    whose matrices live only in the render loop, not on the entry,
+    supplies an explicit ``model_of``.
     """
     def _resolve(anchor: Anchor) -> "np.ndarray | None":
         entry = entries_by_key.get(anchor.cloud_key)
@@ -159,7 +156,7 @@ class MeasureItem:
     obtained from ``make_resolver(entries_by_key, model_of=...)``.
 
     Why the resolver pattern: a measurement spanning two bones has to
-    follow both bones through HOLOGRAM reference-frame switches. The
+    follow both bones through any transform change. The
     only way to do that is to resolve the world position at the moment
     of need, not freeze it at creation time.
     """

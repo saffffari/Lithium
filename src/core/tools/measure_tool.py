@@ -9,8 +9,8 @@ Usage:
   a = state.get_angle_deg(resolve)
 
 Anchors live in cloud-local space — see measure_registry.Anchor — so
-measurements stay glued to their bones when the HOLOGRAM reference
-vertebra changes. ``hover_pos`` stays world-space because it's just
+measurements stay glued to their bones when a transform changes.
+``hover_pos`` stays world-space because it's just
 the in-flight cursor preview; it converts to an Anchor at the moment
 add_anchor is called.
 """

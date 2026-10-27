@@ -791,11 +791,7 @@ def _handle_sidebar_resize(app):
 
 def _draw_tab_bar(app):
     """Browser-style tabs: rounded top, flat bottom, active tab connects
-    to a baseline strip. One per workflow mode, color-coded by stage.
-
-    In Clinician mode the research-only tabs (Contact Sheets / Light /
-    Train) are hidden so the surgeon sees only the workflow they need:
-    Imaging → Hologram → Overwatch."""
+    to a baseline strip. One per workflow mode, color-coded by stage."""
     dl = imgui.get_window_draw_list()
     wx, wy = imgui.get_cursor_screen_pos()
     w = imgui.get_content_region_available_width()

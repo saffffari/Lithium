@@ -512,28 +512,16 @@ def build_endplate_ontology() -> LabelRegistry:
 
 
 def build_clinical_endplate_ontology() -> LabelRegistry:
-    """Minimum-viable clinical-measurement ontology for spine analysis.
-
-    Five classes designed to cover ~13 of the 16 measurements in the
-    SpineLab project's measurement_dependency_matrix using only surface
-    segmentation + post-process clustering. Pairs with a downstream
-    ``landmark_extraction`` module that turns predicted "Process Tip"
-    points into named anatomical landmarks (SP, L-TP, R-TP) by
-    DBSCAN-clustering the predictions and identifying each cluster's
-    role from its position in the local vertebral frame (which itself
-    derives from the endplates).
+    """Compact endplate + process-tip ontology for vertebral surfaces.
 
     IDs:
         1  Superior Endplate          paint to the rim, not just the central
-                                       flat region — corners are derived from
-                                       the rim downstream.
+                                       flat region.
         2  Inferior Endplate          same.
-        3  S1 Superior Endplate       sacral; geometrically distinct, drives
-                                       PI / PT / SS independently.
+        3  S1 Superior Endplate       sacral endplate, kept separate.
         4  Process Tip                combined SP + TP + facet tips. Paint a
                                        small cluster (~30-50 points) at each
-                                       visible tip; downstream clustering
-                                       splits them back out.
+                                       visible tip.
 
     Annotation cost per vertebra: ~3-5 minutes (vs. ~25-40 for full
     process-surface labeling). Severe tip imbalance is expected

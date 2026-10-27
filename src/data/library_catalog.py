@@ -77,10 +77,9 @@ class LibraryEntry:
         bounds_max=None,
         import_date: float | None = None,
         last_opened: float | None = None,
-        # Reserved fields, populated by IMAGING when DICOM metadata is
-        # present, otherwise None. Schema-only for now — no UI reads or
-        # writes these yet, but having them in place means future code
-        # doesn't trigger a catalog migration.
+        # Reserved metadata fields, None unless a dataset supplies them.
+        # Schema-only — no UI reads or writes these, but keeping them
+        # means older catalogs load without a migration.
         patient_id: str | None = None,
         study_id: str | None = None,
         region: str | None = None,
@@ -109,7 +108,7 @@ class LibraryEntry:
         self.last_opened = last_opened if last_opened is not None else now
         # Lazy in-memory preview
         self.preview_data: PointCloudData | None = None
-        # IMAGING / HOLOGRAM reserved fields (see __init__ signature).
+        # Reserved metadata fields (see __init__ signature).
         self.patient_id = patient_id
         self.study_id = study_id
         self.region = region
@@ -137,7 +136,7 @@ class LibraryEntry:
             "import_date": float(self.import_date),
             "last_opened": float(self.last_opened),
             # Reserved fields — only written when non-default so existing
-            # entries stay byte-stable until IMAGING populates them.
+            # entries stay byte-stable.
             "patient_id": self.patient_id,
             "study_id": self.study_id,
             "region": self.region,
@@ -464,9 +463,9 @@ class LibraryCatalog:
 
     def _save_projects(self) -> None:
         # CP-2: same guard as _save_index. The projects dict can be
-        # mutated by add_to_project from a background event handler
-        # (ST-4 imaging_add_to_project) — though it runs on the main
-        # thread today, the lock keeps future producers safe.
+        # mutated by add_to_project from a background event handler —
+        # though it runs on the main thread today, the lock keeps
+        # future producers safe.
         with self._lock:
             self._bump_version()
             data = {k: p.to_dict() for k, p in self.projects.items()}

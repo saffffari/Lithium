@@ -18,10 +18,9 @@ class PointCloudData:
     model_transform: np.ndarray = field(default=None)
     labels: np.ndarray = field(default=None)  # (N,) int32, 0 = unlabeled
     metadata: dict = field(default_factory=dict)  # free-form (spacing, source, etc.)
-    # Raw supine→standing 4x4 from PolyPose (mm, original CT frame).
-    # None = no pose imported yet. Distinct from ``model_transform``,
-    # which is the user-driven gizmo edit in LIGHT TABLE; this one
-    # comes from PolyPose and drives the HOLOGRAM multi-vertebra scene.
+    # Optional imported 4x4 pose (mm). None = no pose imported.
+    # Distinct from ``model_transform``, which is the user-driven
+    # gizmo edit in LIGHT TABLE. Kept for catalog compatibility.
     pose_to_world: np.ndarray = field(default=None)
     labels_version: int = 0  # bumped on every in-place label mutation; render
                               # caches that key on cloud identity (e.g. the

@@ -1,10 +1,9 @@
 """Point cloud → triangulated mesh via Poisson surface reconstruction.
 
-Used by the IMAGING ingest pipeline and the HOLOGRAM display mode to
-produce a watertight surface representation of each per-vertebra cloud.
-For our anatomical clouds (~25-40k points, surface-sampled, reasonably
-uniform density) Poisson at ``depth=9`` gives clinically-recognisable
-surfaces in ~1-2 seconds per cloud.
+Used by the optional mesh display mode to produce a watertight surface
+for each cloud. For surface-sampled clouds of ~25-40k points with
+reasonably uniform density, Poisson at ``depth=9`` gives clean surfaces
+in ~1-2 seconds per cloud.
 
 Per-vertex label mapping: each mesh vertex is assigned the label of its
 nearest source point via cKDTree. Lets the mesh shader tint by class

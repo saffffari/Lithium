@@ -278,9 +278,9 @@ def save_cloud_data(
             "local_origin": [float(v) for v in local_origin],
             "source_unit": source_unit,
             "voxel_spacing": [float(v) for v in voxel_spacing] if voxel_spacing else None,
-            # Segmentation label this cloud was carved from. PolyPose
-            # pose-import matches transforms.json bones to clouds via this
-            # field, so it MUST survive a catalog cold-load.
+            # Segmentation label this cloud was carved from. Pose import
+            # matches bones to clouds via this field, so it MUST survive
+            # a catalog cold-load.
             "source_label_id": int(source_label_id) if source_label_id is not None else None,
         }
 
@@ -293,7 +293,7 @@ def save_cloud_data(
             np_kwargs[f"scalar_{k}"] = np.ascontiguousarray(
                 cloud.scalars[k], dtype=np.float32
             )
-        # PolyPose supine→standing matrix, stored only when present so
+        # Optional imported pose matrix, stored only when present so
         # existing posed-cloud files don't grow a useless identity blob.
         if getattr(cloud, "pose_to_world", None) is not None:
             np_kwargs["pose_to_world"] = np.ascontiguousarray(
@@ -366,7 +366,7 @@ def load_cloud_data(
                 if key in files:
                     scalars[k] = np.asarray(npz[key], dtype=np.float32)
 
-            # PolyPose pose, if persisted. Must be pulled inside the
+            # Imported pose, if persisted. Must be pulled inside the
             # with-block — npz arrays are lazy-loaded and become unreadable
             # once the file handle closes.
             pose_to_world = None

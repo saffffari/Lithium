@@ -102,7 +102,7 @@ def main() -> int:
     ap.add_argument("--path-map", action="append", default=[],
                     metavar="OLD=NEW",
                     help="rewrite source file path prefixes (repeatable). "
-                         "For backups: --path-map /home/alex=/backup/alex")
+                         "For backups: --path-map /old/home=/backup/home")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 
