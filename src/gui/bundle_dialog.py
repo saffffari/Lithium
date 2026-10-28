@@ -6,9 +6,9 @@ Three pieces:
   live byte estimates, choose a file, go;
 * IMPORT: pick a ``.li`` and it comes in as-is — a new project, or a
   merge into the project it was exported from when that still exists;
-* the PROGRESS overlay: a ring of points that fills clockwise as the
-  job runs (the point-cloud motif in the app's orange), then bursts
-  and draws a check mark when it finishes.
+* the PROGRESS overlay: a lithium atom that assembles itself from loose
+  particles as the job runs (``src.gui.atom_loader``) and settles into a
+  stable Li-7 when it finishes.
 
 The work itself runs on a worker thread through ``src.data.bundle``;
 progress and completion come back through ``app.post_event`` and are
@@ -17,7 +17,6 @@ applied on the main thread, like inference and training already do.
 
 from __future__ import annotations
 
-import math
 import os
 import threading
 import time
@@ -25,6 +24,7 @@ import time
 import imgui
 
 from src.data import bundle
+from src.gui.atom_loader import AtomSim, draw_atom
 from src.gui.scale import s
 from src.gui.theme import *
 
@@ -59,6 +59,8 @@ class _Job:
         self.result = None                # manifest (export) / ImportResult (import)
         self.out_path = ""
         self.thread: threading.Thread | None = None
+        self.atom = AtomSim()             # the progress animation
+        self.atom_clock = self.started
 
     @property
     def fraction(self) -> float:
@@ -104,8 +106,14 @@ def request_import(app) -> None:
     ones the target already has.
     """
     path = _pick_open_path()
-    if not path:
-        return
+    if path:
+        import_bundle_path(app, path)
+
+
+def import_bundle_path(app, path: str) -> None:
+    """Import ``path`` with the same rules as File > Import Project.
+    Also used for a ``.li`` dropped on the window or given on the
+    command line."""
     try:
         m = bundle.inspect_bundle(path)
     except bundle.BundleError as e:
@@ -375,17 +383,7 @@ def _draw_export_modal(app) -> None:
 # Progress overlay
 # ---------------------------------------------------------------------------
 
-_RING_POINTS = 72
 _HOLD_AFTER_DONE = 2.6      # seconds the finished card stays before auto-closing
-
-
-def _ease_out(t: float) -> float:
-    t = max(0.0, min(1.0, t))
-    return 1.0 - (1.0 - t) ** 3
-
-
-def _lerp(a, b, t):
-    return tuple(a[i] + (b[i] - a[i]) * t for i in range(4))
 
 
 def draw_bundle_overlay(app) -> None:
@@ -397,8 +395,10 @@ def draw_bundle_overlay(app) -> None:
         return
     now = time.monotonic()
     if not job.running and not job.error and (now - job.finished_at) > _HOLD_AFTER_DONE:
-        _job = None
-        return
+        # let the atom finish forming first (bounded, in case of a stall)
+        if job.atom.complete or (now - job.finished_at) > _HOLD_AFTER_DONE + 3.0:
+            _job = None
+            return
 
     W, H = app.width, app.height
     cw, ch = s(440), s(300)
@@ -416,59 +416,26 @@ def draw_bundle_overlay(app) -> None:
     tw = imgui.calc_text_size(title)[0]
     dl.add_text(x0 + (cw - tw) * 0.5, y0 + th * 0.6, col32(border), title)
 
-    # The ring: points around a circle. While running, a brightness
-    # wave travels around it and the completed fraction is lit in
-    # orange; when done the points fly outward and fade while a check
-    # mark draws itself in the middle.
+    # The atom: loose particles snap into a Li-7 nucleus, then into the
+    # three rings of the POINT SIZE icon, as the job progresses. A failed
+    # or cancelled job lets them fly apart instead.
     cx, cy = x0 + cw * 0.5, y0 + th * 2.2 + s(70)
-    R = s(56)
-    r_pt = max(1.5, s(2.2))
+    R = s(52)
     frac = job.fraction
     t_run = now - job.started
-    done_t = (now - job.finished_at) if job.finished_at is not None else 0.0
-    burst = _ease_out(done_t / 0.7) if (job.finished_at and not job.error and not job.cancelled) else 0.0
+    ok = job.finished_at is not None and not job.error and not job.cancelled
+    sim = job.atom
+    if job.error or job.cancelled:
+        sim.decay()
+    sim.step(now - job.atom_clock, frac, finished=ok)
+    job.atom_clock = now
+    tint = "error" if job.error else ("cancel" if job.cancelled else "normal")
+    glow = (now - job.finished_at) if (ok and sim.complete) else 0.0
+    dl.push_clip_rect(x0 + 1, y0 + th * 1.8, x0 + cw - 1, y0 + ch - 1, True)
+    draw_atom(dl, sim, cx, cy, R, tint=tint, glow=glow)
+    dl.pop_clip_rect()
 
-    for i in range(_RING_POINTS):
-        a = -math.pi / 2 + 2 * math.pi * i / _RING_POINTS
-        lit = (i / _RING_POINTS) < frac
-        wave = 0.5 + 0.5 * math.sin(t_run * 3.0 - a * 2.0)
-        if job.error:
-            col = _lerp(DIM, RED, 0.6)
-        elif lit:
-            col = _lerp(ORANGE, AMBER, wave * 0.5)
-        else:
-            col = _lerp(FAINT, DIM, wave)
-        rr = R + burst * s(14)
-        alpha = col[3] * (1.0 - 0.72 * burst)
-        px, py = cx + math.cos(a) * rr, cy + math.sin(a) * rr
-        dl.add_circle_filled(px, py, r_pt * (1.0 + 0.6 * (wave if lit else 0.0)),
-                             col32((col[0], col[1], col[2], alpha)), 8)
-
-    if burst > 0.0:
-        # Check mark: two strokes, drawn in sequence over ~0.5 s.
-        p0 = (cx - s(20), cy + s(2))
-        p1 = (cx - s(6), cy + s(16))
-        p2 = (cx + s(22), cy - s(14))
-        t = _ease_out(done_t / 0.5)
-        if t < 0.5:
-            u = t / 0.5
-            q = (p0[0] + (p1[0] - p0[0]) * u, p0[1] + (p1[1] - p0[1]) * u)
-            dl.add_line(p0[0], p0[1], q[0], q[1], col32(ORANGE), s(4))
-        else:
-            u = (t - 0.5) / 0.5
-            q = (p1[0] + (p2[0] - p1[0]) * u, p1[1] + (p2[1] - p1[1]) * u)
-            dl.add_line(p0[0], p0[1], p1[0], p1[1], col32(ORANGE), s(4))
-            dl.add_line(p1[0], p1[1], q[0], q[1], col32(ORANGE), s(4))
-    else:
-        pct = f"{int(frac * 100):d}%" if job.total else "..."
-        if job.error:
-            pct = "!"
-        elif job.cancelled:
-            pct = "×"
-        pw = imgui.calc_text_size(pct)[0]
-        dl.add_text(cx - pw * 0.5, cy - th * 0.5, col32(WHITE), pct)
-
-    # Status lines under the ring.
+    # Status lines under the atom.
     ly = cy + R + s(22)
     if job.error:
         lines = [("Failed", RED), (job.error[:70], DIM)]
@@ -482,7 +449,8 @@ def draw_bundle_overlay(app) -> None:
         eta = ""
         if job.done > 2 and job.total:
             eta = f"  ·  ~{(el / job.done) * (job.total - job.done):.0f} s left"
-        lines = [(f"{stage}  {job.done} / {job.total}", WHITE),
+        pct = f"{int(frac * 100):d}%  ·  " if job.total else ""
+        lines = [(f"{pct}{stage}  {job.done} / {job.total}", WHITE),
                  (f"{bundle.human_bytes(job.nbytes)}{eta}", DIM)]
     else:
         if job.kind == "export":

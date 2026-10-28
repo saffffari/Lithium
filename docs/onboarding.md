@@ -49,12 +49,12 @@ Press `?` in the app for the shortcut card. The loop is:
 
 1. **Double-click** a tile to open the cloud in the **Light Table**.
 2. **Click a label** in the LABELS list, or press `G` to step through them.
-3. **Pick a tool:** pick (`P`), lasso (`O`), brush (`K`), curve (`U`), or box
+3. **Pick a tool:** pick (`P`), lasso (`O`), brush (`B`), curve (`U`), or box
    and polygon from the toolbar at the top left of the view.
 4. **Hold Shift and drag** to paint the label (Shift+click for pick).
    **Hold Ctrl and drag** to erase it. A plain left-drag pans the view;
    right-drag turns it.
-5. **Move to the next cloud** with `V` or `Right`, the previous one with `B`
+5. **Move to the next cloud** with `E` or `Right`, the previous one with `Q`
    or `Left`, or a mouse thumb wheel.
 
 Labels save themselves after every stroke. There is no Save button.

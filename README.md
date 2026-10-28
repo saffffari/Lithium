@@ -54,9 +54,9 @@ After that, start Lithium with `run.bat` (Windows) or `./run.sh`.
    files onto the window.
 2. Double-click a cloud to open it in the **Light Table**.
 3. Click a label (**+ ADD** makes one), pick a tool (`P` pick, `O` lasso,
-   `K` brush, `U` curve, or the toolbar), then **hold Shift and drag** to
+   `B` brush, `U` curve, or the toolbar), then **hold Shift and drag** to
    paint. Hold Ctrl to erase.
-4. `Ctrl+Z` undoes. `B` / `V`, the arrow keys or a thumb wheel move between
+4. `Ctrl+Z` undoes. `Q` / `E`, the arrow keys or a thumb wheel move between
    clouds. `F` refocuses the view.
 5. Press `?` for every shortcut.
 

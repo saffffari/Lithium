@@ -1229,9 +1229,9 @@ def op1_stats_strip(app, cloud_count: int, total_points: int,
     dl.add_text(fps_x + fps_size[0] + th * 0.15, fps_ty, col32(OP1_GRAY), "fps")
 
     if pending > 0:
-        pulse = (math.sin(time.time() * 4.0) + 1.0) * 0.5
-        dl.add_circle_filled(fps_x - th * 0.6, fps_ty + th * 0.5,
-                             th * 0.28, col32((1.0, 0.35 * pulse, 0.2, 1.0)), 14)
+        from src.gui.atom_loader import draw_atom_badge
+        draw_atom_badge(dl, fps_x - th * 0.75, fps_ty + th * 0.5, th * 0.42,
+                        time.time(), OP1_ORANGE)
 
     mode_color = OP1_GREEN if mode_str == "VIEW" else OP1_ORANGE
     if mode_str == "TRAIN":

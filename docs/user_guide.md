@@ -264,7 +264,7 @@ cloud:
 
 From top to bottom: **CLOUDS** (the clouds in the current view), **LABELS**,
 **BRUSH DISTANCE FALLOFF** (only while the brush is active), **POINT SIZE**,
-**DISPLAY**, **DISPLAY MODE**, **CLIP**, **CAMERA**, then the **MODEL**
+**DISPLAY**, **CLIP**, **CAMERA**, then the **MODEL**
 picker and the **INFER** button when a model is available.
 
 Click a cloud in CLOUDS to switch to it. Drag the handle under the list to
@@ -314,7 +314,7 @@ Press the key again, or `Esc`, to put the tool down.
 | Box (BOX) | toolbar | Shift+drag a rectangle. |
 | Lasso (LSO) | `O` | Shift+drag a freehand outline. |
 | Polygon (PLY) | toolbar | Shift+click to place corners. Shift+double-click to close the shape (three corners or more). |
-| Brush (BRU) | `K` | Shift+drag to paint with a sphere. |
+| Brush (BRU) | `B` | Shift+drag to paint with a sphere. |
 | Curve (CRV) | `U` | Shift+drag a line. Points within a few pixels of it are labelled. |
 | Move (MOV) | toolbar | Drag the gizmo arrows to move the cloud. |
 | Rotate (ROT) | toolbar | Drag the gizmo to rotate the cloud. |
@@ -359,7 +359,7 @@ history.
 
 ### Move between clouds
 
-- `V` or `Right`: next cloud. `B` or `Left`: previous cloud.
+- `E` or `Right`: next cloud. `Q` or `Left`: previous cloud.
 - A horizontal thumb wheel (on mice that have one) also changes cloud, in the
   Light Table and in Contact Sheets. Turn it off, or reverse it, under
   **View > Mouse**.
@@ -390,13 +390,13 @@ selected measurements. Distances are in the cloud's own coordinate units.
 | Middle-drag | Depth of field (the FOCUS knob). Drag up for more. |
 | Wheel | Zoom toward the point under the cursor. |
 | Middle button + wheel | Point size. |
-| Alt+click, no tool | Place the 3D cursor without moving the camera. |
+| Alt+click | Make the clicked point's label the active label. With no tool, also place the 3D cursor without moving the camera. |
 
 ### Keys
 
 | Key | Effect |
 |---|---|
-| `F` | Focus on the 3D cursor if one is placed, otherwise frame the selected cloud. |
+| `F` | Focus on the 3D cursor if one is placed, otherwise frame the selected cloud. The cursor starts at the centroid of each cloud you open. |
 | `Space` | Place the 3D cursor under the mouse and zoom to it. |
 | `T` / `R` / `I` | Top, right and isometric views. |
 | `C` (outside the Light Table) | Clear the 3D cursor and frame everything. |
@@ -423,9 +423,9 @@ selected measurements. Distances are in the cloud's own coordinate units.
 | POINT SIZE | Size of each point. |
 | DISPLAY: FOCUS | Depth of field. 0 turns it off. |
 | DISPLAY: DEPTH | Darkens points with distance. |
-| DISPLAY: SOFT | Saturation. |
+| DISPLAY: SHADE | Ambient-occlusion shading in creases. 0 turns it off. |
 | DISPLAY: COLOR | Brightness. |
-| DISPLAY MODE | POINTS, MESH or BOTH. MESH and BOTH need `open3d`. |
+| Display mode (top-right of the viewport) | Points, mesh, or both. Mesh and both need `open3d`. |
 | CLIP | One fader per axis (R, S, A) with low and high limits. Click a letter to turn that axis on or off. Double-click a fader to reset it. |
 
 Drag a DISPLAY knob up or down to change it. Double-click or right-click to
@@ -478,7 +478,8 @@ clouds, its labels and its trained models.
   clouds**, **Labels** and/or **Model weights**. The dialog shows the size of
   each part.
 - **File > Import Project (.li)...**: pick the file. Lithium imports
-  everything inside and opens the project.
+  everything inside and opens the project. Dropping a `.li` file on the
+  window, or passing it on the command line, does the same.
 
 An import creates a new project, unless the project it was exported from
 exists in your catalog; then it merges into that project. Imported labels
@@ -613,7 +614,7 @@ with `--help` for the full list.
 ### Sequences
 
 A folder in which every file name contains a number opens as a sequence: one
-time series with a timeline. `Left` and `Right` (and `B` / `V`) step through
+time series with a timeline. `Left` and `Right` (and `Q` / `E`) step through
 frames. In the console, `propagate` copies labels from the current frame to
 the next by nearest neighbour, and `propagate-all` repeats that through the
 remaining frames. Check each frame afterwards.
@@ -645,14 +646,14 @@ Shortcuts are ignored while you type in a text field.
 | `1` / `2` / `3` | Contact Sheets / Light Table / Train |
 | `?` | Shortcut overlay |
 | `Esc` | Close the overlay, put down the tool, clear the selection, or go back to Contact Sheets, in that order. It never quits; use **File > Quit** or close the window. |
-| `P` / `O` / `K` / `U` | Pick / Lasso / Brush / Curve tool |
+| `P` / `O` / `B` / `U` | Pick / Lasso / Brush / Curve tool |
 | `G` | Next label (Light Table) |
 | `H` | Hide or show the active label (Light Table); hide or show the interface elsewhere |
 | `Shift+H` | Hide or show the interface |
 | `C` | Show all labels (Light Table); clear the 3D cursor and frame everything elsewhere |
 | `L` | Label colours or original colours |
-| `V` / `Right` | Next cloud (Light Table) or frame (sequence) |
-| `B` / `Left` | Previous cloud (Light Table) or frame (sequence) |
+| `E` / `Right` | Next cloud (Light Table) or frame (sequence) |
+| `Q` / `Left` | Previous cloud (Light Table) or frame (sequence) |
 | `F` | Focus the 3D cursor, or frame the selected cloud |
 | `Space` | Place the 3D cursor and zoom to it (Light Table) |
 | `T` / `R` / `I` | Top / right / isometric view |
@@ -679,7 +680,7 @@ Shortcuts are ignored while you type in a text field.
 | Ctrl + wheel | Tool size or depth limit | Cell size |
 | Shift + wheel | | Zoom the selected preview |
 | Middle button + wheel | Point size | |
-| Alt+click | Place the 3D cursor | |
+| Alt+click | Pick the clicked point's label (and place the 3D cursor) | |
 | Double-click | Shift+double-click closes a polygon | Open in the Light Table |
 | Thumb wheel | Previous / next cloud | Previous / next cloud |
 
@@ -729,7 +730,7 @@ The last four are for measuring Lithium on machines you cannot watch.
   **Re-attach source...** to point Lithium at the new location.
 - **The interface is too big or too small on another screen:** press
   `Ctrl+0` to reset the interface size.
-- **Colours look washed out:** reset COLOR, SOFT and DEPTH by double-clicking
+- **Colours look washed out:** reset COLOR, SHADE and DEPTH by double-clicking
   them. Windows HDR and monitor colour profiles also change what you see.
 
 ## Platform notes

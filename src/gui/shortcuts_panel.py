@@ -16,10 +16,10 @@ from src.gui.theme import *
 # full workflow lives in docs/user_guide.md; this is the card on the
 # wall next to the machine.
 GETTING_STARTED = [
-    ("1.", "CONTACT SHEETS: double-click a bone to open it"),
-    ("2.", "LIGHT TABLE: Choose a label and a tool (P / O / K)"),
+    ("1.", "CONTACT SHEETS: double-click a cloud to open it"),
+    ("2.", "LIGHT TABLE: Choose a label and a tool (B brush, O lasso, P pick)"),
     ("3.", "Shift+drag paints, Ctrl+drag erases; G cycles labels"),
-    ("4.", "Thumb wheel or LEFT / RIGHT: next bone (autosaves)"),
+    ("4.", "Q / E, arrows or thumb wheel: previous / next cloud (autosaves)"),
     ("5.", "Mistake? Ctrl+Z. Lost? F focuses the view"),
 ]
 
@@ -27,19 +27,18 @@ SHORTCUTS = [
     ("MOUSE", [
         ("RMB drag", "Orbit camera (flick to spin)"),
         ("RMB hold", "Radial preset menu (right/top/left/bottom)"),
-        ("MMB drag", "Pan camera"),
+        ("MMB drag", "Depth of field (FOCUS)"),
         ("Scroll", "Zoom (dolly-under-cursor)"),
         ("Thumb wheel", "Previous / next cloud"),
-        ("Alt + LMB", "Place 3D cursor (no zoom)"),
+        ("Alt + click", "Pick that point's label (and place 3D cursor)"),
         ("MMB + scroll", "Adjust point size"),
-        ("LMB double-click", "Place 3D cursor + focus"),
         ("LMB drag", "Pan camera"),
         ("Shift + LMB drag", "Paint with the active tool"),
         ("Ctrl + LMB drag", "Erase the active label"),
     ]),
     ("NAVIGATION", [
         ("1 / 2 / 3", "Switch tab (Sheets / Light Table / Train)"),
-        ("ESC", "Back to Contact Sheets / Exit"),
+        ("ESC", "Put the tool down / back to Contact Sheets"),
         ("H / C", "Hide active label / show all labels (Light Table)"),
         ("G", "Next label (Light Table)"),
         ("T / R / I", "Top / right / isometric view"),
@@ -49,9 +48,9 @@ SHORTCUTS = [
     ]),
     ("SELECTION", [
         ("P", "Pick tool"),
-        ("B / V", "Previous / next cloud (Light Table)"),
+        ("Q / E", "Previous / next cloud (Light Table)"),
         ("O", "Lasso tool"),
-        ("K", "Brush tool"),
+        ("B", "Brush tool"),
         ("U", "Curve tool"),
         ("Shift + click", "Paint (Pick tool)"),
         ("Ctrl + click", "Erase (Pick tool)"),

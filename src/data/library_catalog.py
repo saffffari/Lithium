@@ -753,11 +753,15 @@ class LibraryCatalog:
             cloud = load_point_cloud(entry.file_path)
             preview = voxel_downsample(cloud, self.preview_points)
             p = entry.preview_path(self.dir)
+            # Write then rename: the gallery loads any preview file that
+            # exists, so a half-written one would fail and stay blank.
+            tmp = f"{p}.tmp.npz"
             np.savez_compressed(
-                p,
+                tmp,
                 positions=preview.positions,
                 colors=preview.colors,
             )
+            os.replace(tmp, p)
             # Return data for the main thread to apply atomically
             return (entry, preview,
                     int(cloud.point_count),

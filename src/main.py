@@ -615,6 +615,7 @@ class App:
         # SSAO on point splats gives every big disc a dark halo at close zoom
         # (the "fuzzy" look) — off by default, persisted, F6 toggles.
         self.ssao_enabled = bool(prefs.get("ssao_enabled", False))
+        self._ssao_strength = float(prefs.get("ssao_strength", 0.8))
         self.r_gain = float(prefs.get("r_gain", self.r_gain))
         self.g_gain = float(prefs.get("g_gain", self.g_gain))
         self.b_gain = float(prefs.get("b_gain", self.b_gain))
@@ -899,7 +900,7 @@ class App:
             'radius':   8.0,    # mm in view-space units
             'bias':     0.025,  # suppress self-occlusion on flat faces
             'power':    1.9,    # exponent applied to AO factor
-            'strength': 0.8,    # 0 = no AO, 1 = full
+            'strength': float(getattr(self, '_ssao_strength', 0.8)),  # 0..1, SHADE knob
         }
         self.ssao_enabled = bool(getattr(self, "ssao_enabled", False))
 
@@ -1309,6 +1310,7 @@ class App:
             'label_blend': float(self.label_blend),
             'exposure': float(self.exposure),
             'ssao_enabled': bool(self.ssao_enabled),
+            'ssao_strength': float(getattr(self, 'ssao_params', {}).get('strength', 0.8)),
         })
 
     def _persist_cloud_labels(self, entry, cloud) -> bool:
@@ -2024,11 +2026,25 @@ class App:
             self.camera.focus_on(center)
 
         self._overlays_dirty = True
-        self.cursor3d.clear()
+        self._cursor_to_centroid(new_entry)
         self._auto_scale_brush()
         if announce:
             print(f"→ {new_entry.name}")
         return True
+
+    def _cursor_to_centroid(self, entry) -> None:
+        """Start the 3D cursor at the centroid of the cloud just opened,
+        so F and the orbit pivot have a sensible anchor straight away."""
+        gpu = entry.full_gpu or entry.preview_gpu
+        if gpu is not None and gpu.cloud_data is not None and gpu.cloud_data.positions.size:
+            local = gpu.cloud_data.positions.mean(axis=0)
+        elif entry.bounds_min is not None and entry.bounds_max is not None:
+            local = (np.asarray(entry.bounds_min) + np.asarray(entry.bounds_max)) / 2.0
+        else:
+            self.cursor3d.clear()
+            return
+        world = entry.model_transform @ np.array([*local, 1.0], dtype=np.float32)
+        self.cursor3d.place(world[:3])
 
     def _navigate_cloud(self, delta: int):
         """Move to the next/previous cloud in the current view.
@@ -2491,7 +2507,7 @@ class App:
                 entry.bounds_max = pos.max(axis=0)
         if entry.bounds_min is not None and entry.bounds_max is not None:
             self.camera.fit_to_bounds(entry.bounds_min, entry.bounds_max)
-        self.cursor3d.clear()
+        self._cursor_to_centroid(entry)
         self.reset_clip()
         self._overlays_dirty = True
         if enter_light_table:
@@ -2878,6 +2894,7 @@ class App:
 
         # Floating horizontal tool toolbar — top-left of viewport, Light Table only
         self._draw_tool_toolbar()
+        self._draw_display_mode_bar()
 
         # Workstation-grade world-axis gnomon in the bottom-left
         self._draw_gnomon_hud()
@@ -3031,6 +3048,73 @@ class App:
                     imgui.set_tooltip(tip)
             imgui.same_line()
 
+        imgui.end()
+        imgui.pop_style_var(3)
+        imgui.pop_style_color(1)
+
+    def _draw_display_mode_bar(self):
+        """POINTS / MESH / BOTH as three icon buttons, top-right of the
+        Light Table viewport (moved out of the sidebar)."""
+        if self.mode != MODE_LIGHT_TABLE or not self.gui_visible:
+            return
+        from src.gui.scale import s
+        from src.gui.theme import OP1_GREEN, OP1_DIM, OP1_GRAY, col32
+        from src.gui.op1_widgets import (
+            draw_styled_rect, draw_styled_rect_active, BUTTON_ROUNDING)
+
+        def icon_points(dl, cx, cy, r, c):
+            for dx, dy in ((-0.6, -0.4), (0.1, -0.7), (0.7, -0.1),
+                           (-0.3, 0.3), (0.4, 0.6), (-0.8, 0.7)):
+                dl.add_circle_filled(cx + dx * r, cy + dy * r, max(1.0, r * 0.16), c, 8)
+
+        def icon_mesh(dl, cx, cy, r, c):
+            a, b, d, e = ((cx - r, cy + r * 0.7), (cx, cy - r),
+                          (cx + r, cy + r * 0.7), (cx, cy + r * 0.1))
+            for p, q in ((a, b), (b, d), (d, a), (a, e), (b, e), (d, e)):
+                dl.add_line(p[0], p[1], q[0], q[1], c, max(1.0, r * 0.12))
+
+        def icon_both(dl, cx, cy, r, c):
+            icon_mesh(dl, cx, cy, r, c)
+            for p in ((cx - r, cy + r * 0.7), (cx, cy - r),
+                      (cx + r, cy + r * 0.7), (cx, cy + r * 0.1)):
+                dl.add_circle_filled(p[0], p[1], max(1.2, r * 0.22), c, 8)
+
+        modes = (("points", "Points", icon_points), ("mesh", "Mesh", icon_mesh),
+                 ("both", "Points + mesh", icon_both))
+        th = imgui.get_text_line_height()
+        btn_sz = th * 2.2
+        gap, pad = s(3), s(6)
+        bar_w = 3 * btn_sz + 2 * gap + pad * 2
+        bar_h = btn_sz + pad * 2
+        menu_h = getattr(self, '_menu_bar_height', 0.0)
+        imgui.set_next_window_position(self.width - bar_w - s(8), menu_h + s(8), imgui.ALWAYS)
+        imgui.set_next_window_size(bar_w, bar_h, imgui.ALWAYS)
+        imgui.push_style_color(imgui.COLOR_WINDOW_BACKGROUND, 0.04, 0.04, 0.04, 0.88)
+        imgui.push_style_var(imgui.STYLE_WINDOW_PADDING, (pad, pad))
+        imgui.push_style_var(imgui.STYLE_ITEM_SPACING, (gap, 0.0))
+        imgui.push_style_var(imgui.STYLE_WINDOW_ROUNDING, s(6))
+        flags = (imgui.WINDOW_NO_TITLE_BAR | imgui.WINDOW_NO_RESIZE |
+                 imgui.WINDOW_NO_MOVE | imgui.WINDOW_NO_SCROLLBAR |
+                 imgui.WINDOW_NO_SAVED_SETTINGS)
+        imgui.begin("##display_mode_bar", flags=flags)
+        dl = imgui.get_window_draw_list()
+        for value, tip, icon_fn in modes:
+            wx, wy = imgui.get_cursor_screen_pos()
+            active = self.display_mode == value
+            if active:
+                draw_styled_rect_active(dl, wx, wy, btn_sz, btn_sz, OP1_GREEN,
+                                        rounding=BUTTON_ROUNDING)
+            else:
+                draw_styled_rect(dl, wx, wy, btn_sz, btn_sz, OP1_DIM,
+                                 rounding=BUTTON_ROUNDING, thickness=1.0)
+            icon_fn(dl, wx + btn_sz * 0.5, wy + btn_sz * 0.5, btn_sz * 0.26,
+                    col32(OP1_GREEN if active else OP1_GRAY))
+            imgui.invisible_button(f"##dm_{value}", btn_sz, btn_sz)
+            if imgui.is_item_clicked(0):
+                self.display_mode = value
+            if imgui.is_item_hovered():
+                imgui.set_tooltip(tip)
+            imgui.same_line()
         imgui.end()
         imgui.pop_style_var(3)
         imgui.pop_style_color(1)
@@ -5932,6 +6016,26 @@ class App:
         self._drag_ctrl = bool(ctrl)
         self._paint_indices(gpu, np.array([idx], dtype=np.int32))
 
+    def _eyedrop_label(self, mx: float, my: float) -> None:
+        """Activate the label of the point under the mouse (Alt+click).
+        Unlabelled points and empty space leave the active label alone."""
+        gpu = self._current_gpu_cloud()
+        if gpu is None or gpu.cloud_data.labels is None:
+            return
+        mx, my = self._window_to_fb(mx, my)
+        entry = self.entries[self.selected_index]
+        mvp = (self.camera.get_projection_matrix() @ self.camera.get_view_matrix()
+               @ entry.model_transform)
+        vp_x, vp_y, vp_w, vp_h = self._primary_viewport_screen_rect()
+        idx = pick_point(gpu.cloud_data.positions, mvp,
+                         mx - vp_x, my - vp_y, vp_w, vp_h,
+                         radius_px=PICK_RADIUS_PX)
+        if idx < 0:
+            return
+        lid = int(gpu.cloud_data.labels[idx])
+        if lid != 0 and self.label_registry.get(lid) is not None:
+            self.active_label_id = lid
+
     def _do_brush_at(self, mx: float, my: float):
         """Paint the points under the brush directly onto the active layer.
 
@@ -6878,13 +6982,16 @@ class App:
         # clean (non-drag) mouse releases so orbit drags are unaffected.
         # Spacebar is the place+zoom path; this handler covers the
         # silent "drop marker" gesture.
-        #   Alt+LMB click → place cursor (no zoom)
-        if (self.mode == MODE_LIGHT_TABLE and self.active_tool is None
+        #   Alt+LMB click → make the clicked point's label the active one
+        #   (any tool), and place the cursor there when no tool is held
+        if (self.mode == MODE_LIGHT_TABLE
                 and button == 0 and click_kind == 'click'
                 and (mods & glfw.MOD_ALT)):
-            hit = self._pick_world_position(mx, my)
-            if hit is not None:
-                self.cursor3d.place(hit)
+            self._eyedrop_label(mx, my)
+            if self.active_tool is None:
+                hit = self._pick_world_position(mx, my)
+                if hit is not None:
+                    self.cursor3d.place(hit)
 
         # Measure tool anchor placement — plain LMB click snaps to nearest point.
         # No Shift/Ctrl modifier required. Camera still orbits on drag;
@@ -7414,18 +7521,10 @@ class App:
             # Shift+B → toggle bbox overlay (was plain B)
             self.show_bbox = not self.show_bbox
         elif key == glfw.KEY_B and not (mods & glfw.MOD_CONTROL):
-            # B in LIGHT TABLE = previous cloud (pairs with V = next).
-            # The box-tool shortcut moved to Shift+Alt+B since the
-            # hot-path during labelling is navigation, not tool swap.
-            # Outside LIGHT TABLE plain B does nothing (no box tool
-            # anywhere else anyway).
-            if self.mode == MODE_LIGHT_TABLE:
-                if self.sequence is not None:
-                    self._seek_sequence(self.sequence.current_index - 1)
-                else:
-                    self._navigate_cloud(-1)
-            else:
-                self._toggle_tool('box')
+            # B = brush, the main labelling tool. Cloud stepping lives on
+            # Q / E (and the arrow keys) so it sits beside it under the
+            # left hand.
+            self._toggle_tool('brush')
         elif key == glfw.KEY_G and (mods & glfw.MOD_SHIFT):
             self.show_grid = not self.show_grid
         elif key == glfw.KEY_X and (mods & glfw.MOD_CONTROL) and (mods & glfw.MOD_SHIFT):
@@ -7446,8 +7545,6 @@ class App:
             self._toggle_tool('pick')
         elif key == glfw.KEY_O and not (mods & glfw.MOD_CONTROL):
             self._toggle_tool('lasso')
-        elif key == glfw.KEY_K and not (mods & glfw.MOD_CONTROL):
-            self._toggle_tool('brush')
         elif key == glfw.KEY_U and not (mods & glfw.MOD_CONTROL):
             self._toggle_tool('curve')
         elif key in (glfw.KEY_LEFT, glfw.KEY_RIGHT):
@@ -7456,17 +7553,15 @@ class App:
                 self._seek_sequence(self.sequence.current_index + delta)
             elif self.mode == MODE_LIGHT_TABLE:
                 self._navigate_cloud(1 if key == glfw.KEY_RIGHT else -1)
-        elif key == glfw.KEY_V and not (mods & (glfw.MOD_CONTROL | glfw.MOD_ALT
-                                                | glfw.MOD_SHIFT)):
-            # V = next cloud. Same effect as pressing → but reachable
-            # with the left hand at typing position; saves the wrist
-            # stretch over a long labeling session. Sequence mode
-            # advances the timeline; Light Table advances the
-            # gallery list.
+        elif key in (glfw.KEY_Q, glfw.KEY_E) and not (
+                mods & (glfw.MOD_CONTROL | glfw.MOD_ALT | glfw.MOD_SHIFT)):
+            # Q / E = previous / next cloud (or 4D frame), left hand on
+            # the home row next to the brush on B.
+            delta = -1 if key == glfw.KEY_Q else 1
             if self.sequence is not None:
-                self._seek_sequence(self.sequence.current_index + 1)
+                self._seek_sequence(self.sequence.current_index + delta)
             elif self.mode == MODE_LIGHT_TABLE:
-                self._navigate_cloud(1)
+                self._navigate_cloud(delta)
         elif key == glfw.KEY_C and not (mods & (glfw.MOD_CONTROL | glfw.MOD_ALT
                                                 | glfw.MOD_SHIFT)):
             # C = previous cloud. Mirrors V on the keyboard so the
@@ -7531,6 +7626,10 @@ class App:
 
         if os.path.isfile(path):
             ext = os.path.splitext(path)[1].lower()
+            if ext == '.li':
+                from src.gui.bundle_dialog import import_bundle_path
+                import_bundle_path(self, path)
+                return
             if ext not in ('.ply', '.las', '.laz', '.npz'):
                 print(f"Unsupported format: {path}")
                 return

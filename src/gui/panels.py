@@ -475,7 +475,7 @@ def _draw_view_panel(app, show_bg: bool = True,
         # Sized from the bar's WIDTH so the cube fills it edge to edge
         # (cube ~0.9 w, plus the preset/alien row and margins).
         _panel_w = imgui.get_content_region_available_width()
-        panel_h = _panel_w * 1.08 + th * 3.6
+        panel_h = _panel_w * 0.86 + th * 3.0
 
         preset = app.camera.active_preset
         is_planar = preset in PLANAR_PRESETS
@@ -504,7 +504,7 @@ def _draw_view_panel(app, show_bg: bool = True,
         # Always sits below the cube. Orange = ortho, green = perspective.
         # Dimmed when the current preset is planar (click is a no-op —
         # planar views are locked to orthographic).
-        alien_pixel_main = max(s(2.25), th * 0.255)
+        alien_pixel_main = max(s(3.4), th * 0.38)   # 1.5x the old size
         alien_h = alien_pixel_main * 8
         alien_w = alien_pixel_main * 11
 
@@ -514,7 +514,7 @@ def _draw_view_panel(app, show_bg: bool = True,
         bottom_row_y = wy + panel_h - bottom_margin - bottom_row_h
 
         # Cube area fits between the header strip and the bottom row
-        cube_area_top = wy + th * 0.5
+        cube_area_top = wy + th * 0.1
         cube_area_h = max(th * 6.0,
                           bottom_row_y - cube_area_top - th * 0.4)
         cube_area_cy = cube_area_top + cube_area_h * 0.45
@@ -527,28 +527,6 @@ def _draw_view_panel(app, show_bg: bool = True,
         else:
             alien_color = OP1_GREEN
 
-        # Pre-compute an estimated alien position for the hit test; the
-        # actual draw happens after the cube so we can pin to
-        # cube_bottom_center. This estimate lives just below the cube.
-        alien_cx_est = wx + w * 0.5
-        alien_cy_est = cube_area_cy + cube_area_h * 0.38
-
-        ax0 = alien_cx_est - alien_w * 0.5 - s(3)
-        ax1 = alien_cx_est + alien_w * 0.5 + s(3)
-        ay0 = alien_cy_est - alien_h * 0.5 - s(3)
-        ay1 = alien_cy_est + alien_h * 0.5 + s(3)
-        alien_main_hovered = (ax0 <= mxp <= ax1 and ay0 <= myp <= ay1)
-
-        if (not alien_clicked and alien_main_hovered
-                and imgui.is_mouse_clicked(0) and not is_planar):
-            app.camera.projection = (
-                'orthographic' if app.camera.projection == 'perspective'
-                else 'perspective')
-            is_ortho = not is_ortho
-            alien_color = OP1_ORANGE if is_ortho else OP1_GREEN
-            alien_clicked = True
-            changed = True
-
         # --- Draw camera cube(s) ---
         # Multi-viewport: scale by 0.5 per extra view, arrange in 2x2
         if vc == 1:
@@ -558,11 +536,7 @@ def _draw_view_panel(app, show_bg: bool = True,
             clicked_preset, cube_bottom_center = op1_camera_cube(
                 app.camera, active_preset=app.camera.active_preset,
                 size_units=size_units)
-            if not alien_clicked and clicked_preset is not None:
-                app.camera.set_preset(clicked_preset)
-                if clicked_preset in PLANAR_PRESETS:
-                    app.camera.projection = 'orthographic'
-                changed = True
+            pending_preset = clicked_preset
         else:
             # Multi-viewport: one cube per viewport. Layout matches
             # _viewport_rects() in main.py:
@@ -606,6 +580,7 @@ def _draw_view_panel(app, show_bg: bool = True,
                 ]
 
             cube_bottom_center = None
+            pending_preset = None
             for vi, (cam_i, preset_i, sx, sy, sw, sh) in enumerate(slots):
                 imgui.set_cursor_screen_pos((sx, sy))
                 # Scale cube to slot, fit both width and height
@@ -615,11 +590,7 @@ def _draw_view_panel(app, show_bg: bool = True,
                         cam_i, active_preset=preset_i,
                         size_units=slot_units, width=sw)
                     cube_bottom_center = cbc
-                    if not alien_clicked and cp is not None:
-                        app.camera.set_preset(cp)
-                        if cp in PLANAR_PRESETS:
-                            app.camera.projection = 'orthographic'
-                        changed = True
+                    pending_preset = cp
                 else:
                     op1_camera_cube(
                         cam_i, active_preset=preset_i,
@@ -632,6 +603,31 @@ def _draw_view_panel(app, show_bg: bool = True,
         else:
             alien_cx = wx + w * 0.5
             alien_cy = cube_area_cy + cube_area_h * 0.38
+        # The alien sits on the cube's bottom face, so test him first and
+        # let a click on him win over the face behind him. Clicking him
+        # toggles perspective / orthographic; from a flat preset view it
+        # leaves the preset and goes to perspective.
+        alien_hovered = (abs(mxp - alien_cx) <= alien_w * 0.5 + s(3)
+                         and abs(myp - alien_cy) <= alien_h * 0.5 + s(3))
+        if alien_hovered:
+            imgui.set_tooltip("Perspective (green) / orthographic (orange)")
+            if imgui.is_mouse_clicked(0):
+                if is_planar:
+                    app.camera.active_preset = None
+                    app.camera.projection = 'perspective'
+                else:
+                    app.camera.projection = (
+                        'orthographic' if app.camera.projection == 'perspective'
+                        else 'perspective')
+                is_ortho = app.camera.projection == 'orthographic'
+                alien_color = OP1_ORANGE if is_ortho else OP1_GREEN
+                alien_clicked = True
+                changed = True
+        if not alien_clicked and pending_preset is not None:
+            app.camera.set_preset(pending_preset)
+            if pending_preset in PLANAR_PRESETS:
+                app.camera.projection = 'orthographic'
+            changed = True
         op1_alien(dl, alien_cx, alien_cy, alien_pixel_main,
                   col32(alien_color), angle=0.0, profile=profile)
 
@@ -2014,7 +2010,7 @@ def _draw_viewport_view_controls(app, *, for_hologram: bool = False) -> bool:
             c, app.point_size = op1_sphere_size_gauge(app, app.point_size)
             changed |= c
 
-    # --- DISPLAY (4-cell tone grid: FOCUS/DEPTH/SOFT/COLOR) ---
+    # --- DISPLAY (4-cell tone grid: FOCUS/DEPTH/SHADE/COLOR) ---
     # Skipped for HOLOGRAM — these are point-rendering knobs that have
     # no effect on the mesh-locked HOLOGRAM view. SOFT and COLOR DO
     # influence both modes (saturation + brightness), but bundling
@@ -2051,9 +2047,13 @@ def _draw_viewport_view_controls(app, *, for_hologram: bool = False) -> bool:
             (0, 1, 'DEPTH', 'tone_depth', app.depth_falloff, 0.0, 10.0, 0.0,
              'box', OP1_BLUE,
              lambda v: setattr(app, 'depth_falloff', v)),
-            (0, 2, 'SOFT', 'tone_soft', app.saturation, 0.0, 2.0, 1.0,
-             'pyramid', OP1_GREEN,
-             lambda v: setattr(app, 'saturation', v)),
+            # SHADE = ambient-occlusion strength (0 = off): contact
+            # shading in creases, which reads depth on bone surfaces.
+            (0, 2, 'SHADE', 'tone_shade',
+             (app.ssao_params['strength'] if app.ssao_enabled else 0.0),
+             0.0, 1.0, 0.0, 'pyramid', OP1_GREEN,
+             lambda v: (app.ssao_params.__setitem__('strength', v),
+                        setattr(app, 'ssao_enabled', v > 0.01))),
             (0, 3, 'COLOR', 'tone_color', app.brightness, -1.0, 1.0, 0.0,
              'pyramid', OP1_WHITE,
              lambda v: setattr(app, 'brightness', v)),
@@ -2076,41 +2076,7 @@ def _draw_viewport_view_controls(app, *, for_hologram: bool = False) -> bool:
 
         imgui.dummy(tone_w_total, tone_panel_h + s(4))
 
-    # --- DISPLAY MODE (Points / Mesh / Both) ---
-    # Suppressed in HOLOGRAM — locked to mesh rendering.
-    if not for_hologram:
-        op1_section("DISPLAY MODE", OP1_GREEN)
-        dm_th = imgui.get_text_line_height()
-        dm_dl = imgui.get_window_draw_list()
-        dm_x, dm_y = imgui.get_cursor_screen_pos()
-        dm_w_total = imgui.get_content_region_available_width()
-        dm_h = dm_th * 1.7
-        dm_choices = (("POINTS", "points"), ("MESH", "mesh"), ("BOTH", "both"))
-        dm_cur = getattr(app, "display_mode", "points")
-        dm_btn_w = (dm_w_total - s(4) * (len(dm_choices) - 1)) / len(dm_choices)
-        dm_clicked = imgui.is_mouse_clicked(0)
-        mx, my = imgui.get_mouse_pos()
-        for i, (label, value) in enumerate(dm_choices):
-            bx = dm_x + i * (dm_btn_w + s(4))
-            by = dm_y
-            is_active = (dm_cur == value)
-            col = OP1_GREEN if is_active else OP1_DIM
-            if is_active:
-                draw_styled_rect_active(dm_dl, bx, by, dm_btn_w, dm_h, col,
-                                        rounding=BUTTON_ROUNDING, thickness=1.8)
-            else:
-                draw_styled_rect(dm_dl, bx, by, dm_btn_w, dm_h, col,
-                                 rounding=BUTTON_ROUNDING, thickness=1.2)
-            lbl_size = imgui.calc_text_size(label)
-            dm_dl.add_text(bx + (dm_btn_w - lbl_size[0]) * 0.5,
-                           by + (dm_h - dm_th) * 0.5,
-                           imgui.get_color_u32_rgba(*col), label)
-            if (dm_clicked and bx <= mx <= bx + dm_btn_w
-                    and by <= my <= by + dm_h):
-                app.display_mode = value
-                changed = True
-        imgui.dummy(dm_w_total, dm_h + s(4))
-        imgui.spacing()
+    # DISPLAY MODE lives on the viewport now (App._draw_display_mode_bar).
 
     # --- CLIP ---
     if op1_section("CLIP", OP1_ORANGE):

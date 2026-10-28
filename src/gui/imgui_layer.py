@@ -122,11 +122,18 @@ class ImGuiLayer:
         io.fonts.clear()
         io.font_global_scale = 1.0
 
+        # Basic Latin + Latin-1 (default) plus the punctuation the UI and
+        # project names use: en/em dash, bullet, ellipsis (truncated
+        # names), arrows and the minus sign. Without them those glyphs
+        # draw as '?'. The ranges object must outlive the atlas build.
+        self._glyph_ranges = imgui.GlyphRanges([
+            0x0020, 0x00FF, 0x2010, 0x2027, 0x2190, 0x2193, 0x2212, 0x2212, 0])
+
         # 1. UI font — compact, for general text
         font_path = self._find_system_font()
         if font_path:
             self.font_ui = io.fonts.add_font_from_file_ttf(
-                font_path, int(15 * dpi))
+                font_path, int(15 * dpi), glyph_ranges=self._glyph_ranges)
         else:
             self.font_ui = io.fonts.add_font_default()
             io.font_global_scale = dpi
