@@ -1,272 +1,288 @@
-# Training Environment Setup
+# Training setup
 
-Lithium's viz app is torch-free on purpose — the main `.venv` only
-needs numpy, moderngl, imgui, laspy, plyfile. Training happens in a
-**separate conda env** that has PyTorch, CUDA, and Pointcept, and
-Lithium subprocesses into it via `src/training/ptv3_runner.py`. This
-keeps the viz env from breaking every time a ML dependency drifts.
+Lithium can train Point Transformer V3 (PT-v3) segmentation models with
+[Pointcept](https://github.com/Pointcept/Pointcept) and run them on your
+clouds. This page sets up the environment that does that work. You only need
+it for training and inference; viewing and labelling never use it.
 
-This document is the reproducible recipe for that training env.
+## How it fits together
 
-## Linux quick path (verified 2026-07-20, RTX 4090, driver 610)
+The viewer's `.venv` has no PyTorch on purpose. Training and inference run in
+a **separate conda environment** with PyTorch, CUDA and Pointcept. Lithium
+starts that environment's Python as a subprocess
+(`src/training/ptv3_runner.py` for training, `tools/infer_single.py` for
+inference) and reads its output. Machine-learning packages can change versions
+without ever breaking the viewer.
 
-The system CUDA toolkit may be too new for the pinned torch (nvcc 13.x
-vs torch cu12.4 → extension build fails on the major-version check),
-so nvcc 12.4 and gcc 13 live inside the env:
+You need:
+
+- An NVIDIA GPU with a current driver. A 24 GB card trains the default model
+  at batch size 2; smaller cards may need a smaller batch.
+- A **source checkout** of Lithium. Prebuilt builds do not include the helper
+  scripts the subprocesses run.
+- [Miniforge](https://github.com/conda-forge/miniforge) (or Miniconda).
+- A C++ toolchain to build Pointcept's `pointops` CUDA extension. On Linux the
+  recipe installs one into the environment; on Windows you install Visual
+  Studio Build Tools.
+
+The recipes below were last checked with Python 3.11, PyTorch 2.5.1 and
+CUDA 12.4. Pointcept's main branch moves; if a newer clone breaks something,
+the verification step at the end will show it.
+
+## Where Pointcept goes
+
+Clone Pointcept to **`<repo>/training/pointcept`**, where `<repo>` is your
+Lithium checkout. `training/` is in `.gitignore`, so the clone never enters
+Lithium's history.
+
+Use this exact location. Inference (`tools/infer_single.py`, behind the INFER
+button and **File > Predict Current Cloud**) looks for Pointcept there no
+matter what you enter in the app, and `tools/launch_training.py` and
+`tools/test_generated_config.py` default to it.
 
 ```bash
-# Miniforge (user-level)
-curl -fsSL https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh -o /tmp/miniforge.sh
-bash /tmp/miniforge.sh -b -p ~/miniforge3
+cd <repo>
+git clone https://github.com/Pointcept/Pointcept.git training/pointcept
+```
+
+## Linux
+
+The system CUDA toolkit may be newer than the one PyTorch was built with, and
+the `pointops` build refuses a major-version mismatch. So this recipe puts
+`nvcc` 12.4 and `gcc` 13 inside the environment.
+
+```bash
+# Miniforge, user-level (skip if you already have conda)
+curl -fsSL https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh -o miniforge.sh
+bash miniforge.sh -b -p ~/miniforge3
 
 ~/miniforge3/bin/conda create -n lithium-ptv3 python=3.11 -y
 ENVP=~/miniforge3/envs/lithium-ptv3
 
-# Pinned known-good torch
+# PyTorch
 $ENVP/bin/pip install torch==2.5.1 torchvision==0.20.1 \
     --index-url https://download.pytorch.org/whl/cu124
 
-# nvcc 12.4 + gcc 13 inside the env (for the pointops build)
+# nvcc 12.4 and gcc 13 inside the environment, for the pointops build
 ~/miniforge3/bin/conda install -n lithium-ptv3 \
     -c nvidia/label/cuda-12.4.1 cuda-toolkit -y
 ~/miniforge3/bin/conda install -n lithium-ptv3 \
     -c conda-forge gcc_linux-64=13 gxx_linux-64=13 -y
 
-# Remaining deps (peft + wandb are new hard imports in the pinned
-# Pointcept clone; SharedArray builds fine on Linux)
+# The rest of Pointcept's dependencies
 $ENVP/bin/pip install torch_scatter torch_cluster torch_sparse \
     -f https://data.pyg.org/whl/torch-2.5.0+cu124.html
 $ENVP/bin/pip install spconv-cu124 torch-geometric ninja timm addict \
     yapf termcolor tensorboard tensorboardX ftfy regex tqdm einops \
     h5py open3d SharedArray peft wandb
-
-# Build pointops against the env's nvcc + gcc
-cd training/pointcept/libs/pointops
-env CUDA_HOME=$ENVP CC=$ENVP/bin/x86_64-conda-linux-gnu-gcc \
-    CXX=$ENVP/bin/x86_64-conda-linux-gnu-g++ \
-    TORCH_CUDA_ARCH_LIST="8.9" $ENVP/bin/python setup.py install
-
-# Verify (from training/pointcept)
-env PYTHONPATH=$PWD $ENVP/bin/python ../../tools/probe_pointcept.py
-env PYTHONPATH=$PWD:../.. $ENVP/bin/python ../../tools/test_generated_config.py
 ```
 
-Then set `train_python_exe` / `train_pointcept_dir` in
-`~/.lithium/prefs.json` (or via TRAIN tab → POINTCEPT ENV) to
-`$ENVP/bin/python` and `<repo>/training/pointcept`.
+Build `pointops` with the environment's compilers. Set
+`TORCH_CUDA_ARCH_LIST` to your GPU's compute capability, for example `8.6` for
+an RTX 30-series card or `8.9` for an RTX 40-series card.
+`$ENVP/bin/python -c "import torch; print(torch.cuda.get_device_capability())"`
+prints it.
 
-The Windows recipe below remains valid for the Windows box.
+```bash
+cd <repo>/training/pointcept/libs/pointops
+env CUDA_HOME=$ENVP \
+    CC=$ENVP/bin/x86_64-conda-linux-gnu-gcc \
+    CXX=$ENVP/bin/x86_64-conda-linux-gnu-g++ \
+    TORCH_CUDA_ARCH_LIST="8.9" \
+    $ENVP/bin/python setup.py install
+```
 
-## Prerequisites
+The Python to give Lithium is `~/miniforge3/envs/lithium-ptv3/bin/python`.
 
-- Windows 10/11 (Linux works too, steps are similar)
-- NVIDIA GPU with recent driver (tested on RTX 4090, driver 591.86)
-- CUDA toolkit 12.4 installed at
-  `C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.4`
-  (needed for compiling the CUDA extensions in `libs/pointops`)
-- Miniforge or Miniconda already on PATH
-- Visual Studio 2022 Build Tools with MSVC C++ compiler (for pointops)
+## Windows
 
-## Step 1 — Conda env
+You need, before you start:
 
-```cmd
+- The [CUDA Toolkit 12.4](https://developer.nvidia.com/cuda-12-4-0-download-archive),
+  installed in its default location.
+- Visual Studio 2022 Build Tools with the MSVC C++ compiler.
+- Miniforge or Miniconda on `PATH`.
+
+Run these in a Miniforge Prompt (or any shell where `conda` works):
+
+```bat
 conda create -n lithium-ptv3 python=3.11 -y
 conda activate lithium-ptv3
-```
 
-## Step 2 — PyTorch + CUDA 12.4
-
-```cmd
 conda install pytorch torchvision pytorch-cuda=12.4 -c pytorch -c nvidia -y
-```
-
-Verify:
-```cmd
-python -c "import torch; print(torch.__version__, torch.cuda.is_available(), torch.cuda.get_device_name(0))"
-```
-Should print `2.5.x True NVIDIA GeForce RTX 4090` (or your GPU).
-
-## Step 3 — PyG trio via conda (the Windows-friendly way)
-
-```cmd
 conda install pytorch-scatter pytorch-cluster pytorch-sparse -c pyg -y
+
+pip install spconv-cu124 torch-geometric
+pip install ninja timm addict yapf termcolor tensorboard tensorboardX
+pip install ftfy regex tqdm open3d einops h5py peft wandb
 ```
 
-If `pytorch-sparse` isn't available via conda on your platform, fall
-back to the PyG wheel index:
-```cmd
+If conda cannot find `pytorch-sparse`, install it from the PyG wheel index
+instead:
+
+```bat
 pip install torch_sparse -f https://data.pyg.org/whl/torch-2.5.0+cu124.html
 ```
 
-## Step 4 — Remaining pip deps
+Leave out `SharedArray`. It does not build on Windows, and Pointcept and
+Lithium's dataset class work without it.
 
-```cmd
-pip install spconv-cu124
-pip install torch-geometric
-pip install ninja timm addict yapf termcolor tensorboard tensorboardX
-pip install ftfy regex tqdm open3d einops h5py
-```
+### Patch `pointops` for Windows
 
-`sharedarray` is listed in Pointcept's README but fails to build on
-Windows (uses POSIX shared memory). It's optional — Pointcept falls
-back to standard caching when it's missing.
-
-## Step 5 — Clone Pointcept
-
-Pointcept is cloned as a sibling inside the project:
-
-```cmd
-cd D:\Lithium
-git clone https://github.com/Pointcept/Pointcept.git training\pointcept
-```
-
-Note: `training/` is in `.gitignore`. The clone is a local-only
-sibling — it never enters Lithium's git history.
-
-## Step 6 — Patch `libs/pointops/setup.py` on Windows
-
-Pointcept's `libs/pointops/setup.py` has a Linux-only assumption that
-crashes on Windows:
-
-```python
-from distutils.sysconfig import get_config_vars
-(opt,) = get_config_vars("OPT")         # returns None on Windows
-os.environ["OPT"] = " ".join(           # crashes: None has no split
-    flag for flag in opt.split() if flag != "-Wstrict-prototypes"
-)
-```
-
-Edit `training/pointcept/libs/pointops/setup.py` to guard the block:
+`training\pointcept\libs\pointops\setup.py` assumes Linux and fails on Windows
+with `'NoneType' object has no attribute 'split'`. If you see that, guard the
+`OPT` block:
 
 ```python
 from distutils.sysconfig import get_config_vars
 (opt,) = get_config_vars("OPT")
-if opt is not None:                     # Windows: OPT is None, skip
+if opt is not None:                     # None on Windows
     os.environ["OPT"] = " ".join(
         flag for flag in opt.split() if flag != "-Wstrict-prototypes"
     )
 ```
 
-After an upstream `git pull` in the Pointcept clone this patch will
-need to be reapplied until the upstream fix lands (or we submit it).
+Reapply the patch after each `git pull` in the Pointcept clone until upstream
+fixes it.
 
-## Step 7 — Build `pointops` CUDA extension
+### Build `pointops`
 
-```cmd
-cd D:\Lithium\training\pointcept\libs\pointops
+```bat
+cd <repo>\training\pointcept\libs\pointops
 python setup.py install
 ```
 
-This compiles the CUDA kernels against the current PyTorch's
-`torch_cuda_arch_list`. Takes 1-3 minutes on a warm VS Build Tools
-cache. You should see `Successfully installed pointops-1.0` at the end.
+This takes a few minutes and ends with `Successfully installed pointops`.
 
-**Note:** Pointcept bundles a few other CUDA extensions under `libs/`
-(`pointgroup_ops`, `pointops2`, `pointrope`, `pointseg`). We only need
-`pointops` for PT-v3m1. The others are only required if you train
-different models. `pointrope` missing is harmless — Pointcept falls
-back to a pure-Python implementation and logs a one-line warning.
+The Python to give Lithium is
+`<miniforge>\envs\lithium-ptv3\python.exe`.
 
-## Step 8 — Verify Pointcept imports
+## Other Pointcept extensions
 
-Pointcept has no `setup.py` at its root; their install pattern is
-`PYTHONPATH=./ python tools/train.py ...`. Our `ptv3_runner.py` sets
-this automatically, but to verify the env manually:
+Pointcept ships more CUDA extensions under `libs/` (`pointgroup_ops`,
+`pointops2`, `pointrope`, `pointseg`). PT-v3 only needs `pointops`. If
+`pointrope` is missing, Pointcept prints a one-line warning and falls back to a
+pure-Python version.
 
-```cmd
-cd D:\Lithium\training\pointcept
+`flash-attn` is optional too. Lithium's generated configs turn it off
+(`enable_flash=False`).
+
+## Verify
+
+Both checks run from the Pointcept folder with it on `PYTHONPATH`, using the
+training environment's Python.
+
+Linux:
+
+```bash
+cd <repo>/training/pointcept
+PYTHONPATH=$PWD $ENVP/bin/python ../../tools/probe_pointcept.py
+PYTHONPATH=$PWD $ENVP/bin/python ../../tools/test_generated_config.py
+```
+
+Windows:
+
+```bat
+cd <repo>\training\pointcept
 set PYTHONPATH=%CD%
-python D:\Lithium\tools\probe_pointcept.py
+python ..\..\tools\probe_pointcept.py
+python ..\..\tools\test_generated_config.py
 ```
 
-Expected output:
+`probe_pointcept.py` checks that Pointcept imports, that the `PT-v3m1` model
+is registered and that CUDA works. Look for these lines; both values must be
+`True`:
+
 ```
-pointcept module path: D:\Lithium\training\pointcept\pointcept\__init__.py
-MODELS registered: 60
-DATASETS registered: 31
 PT-v3m1 registered: True
 torch CUDA: True
-device: NVIDIA GeForce RTX 4090
-OK: pointcept env ready
+device: <your GPU>
 ```
 
-## Step 9 — End-to-end smoke test
+It prints `OK: pointcept env ready` at the end even when CUDA is missing, so
+check the lines above it.
 
-Generates a fake Lithium export, runs our config generator on it,
-feeds the config to Pointcept, and instantiates PT-v3m1:
+`test_generated_config.py` builds a tiny fake Lithium export, generates a
+config from it, has Pointcept parse it and builds the model. It ends with:
 
-```cmd
-cd D:\Lithium\training\pointcept
-set PYTHONPATH=%CD%
-python D:\Lithium\tools\test_generated_config.py
 ```
-
-Expected final line:
-```
-PT-v3m1 built OK: 46,178,467 parameters
+PT-v3m1 built OK: <N> parameters
 SUCCESS
 ```
 
-## Running a real training run
+## Point Lithium at the environment
 
-Once the env is set up, the normal flow is:
+In Lithium, open **TRAIN > POINTCEPT ENV** and fill in:
 
-1. Label point clouds in Lithium.
-2. Export a dataset via `export_dataset(...)` — writes the
-   `train/val/test/scene_*/` tree plus `classes.json`.
-3. Generate a Pointcept config:
-   ```python
-   from src.training.config_gen import PTv3TrainParams, generate_ptv3_config
-   params = PTv3TrainParams(data_root="D:/Lithium/exports/my_run",
-                            num_classes=0,  # auto-load from classes.json
-                            batch_size=32, epochs=200)
-   generate_ptv3_config(params,
-                        r"D:\Lithium\src\training\pointcept_ext",
-                        r"D:\Lithium\training\runs\my_run\config.py")
-   ```
-4. Launch:
-   ```python
-   from src.training.ptv3_runner import PointceptRunner, PointceptLaunchConfig
-   cfg = PointceptLaunchConfig(
-       python_exe=r"C:\Users\<you>\miniforge3\envs\lithium-ptv3\python.exe",
-       pointcept_dir=r"D:\Lithium\training\pointcept",
-       config_file=r"D:\Lithium\training\runs\my_run\config.py",
-       work_dir=r"D:\Lithium\training\runs\my_run",
-   )
-   PointceptRunner().launch(cfg)
-   ```
-5. After training, take the best checkpoint + a prediction `.npy`
-   from a test run and feed them to `import_predictions()` back in
-   Lithium to close the loop.
+- **python exe:** the environment's Python, from the Linux or Windows section
+  above.
+- **pointcept dir:** `<repo>/training/pointcept`.
 
-## Known issues
+Lithium saves both in `~/.lithium/prefs.json` as `train_python_exe` and
+`train_pointcept_dir`. You can also edit that file directly while Lithium is
+closed.
 
-- **pointops `setup.py` Windows patch** — see Step 6. Document this
-  or upstream it.
-- **pointrope CUDA missing** — Pointcept falls back to PyTorch.
-  Harmless for PT-v3m1 since the model doesn't use it. Ignore the
-  warning on startup.
-- **flash-attn not installed** — optional speed-up. PT-v3m1 works
-  fine without it; `enable_flash=False` is the `config_gen.py`
-  default.
-- **sharedarray not installed** — expected on Windows. Pointcept's
-  default datasets have a fallback. Our `LithiumDataset` doesn't
-  use sharedarray at all.
+Then follow [Training and inference](user_guide.md#training-and-inference) in
+the user guide.
 
-## Required launch parameters (regression-prone)
+## Train without the window
 
-These have each broken a run before:
+`tools/launch_training.py` runs the same launch as the **LAUNCH TRAINING**
+button and waits for it to finish:
 
-- **`pointcept_ext_dir`** must be passed to `PointceptLaunchConfig`. If
-  omitted, `_build_command` at `ptv3_runner.py:458` skips the
-  `python -u -c <bootstrap>` block and the dataloader fails with
-  `KeyError('LithiumDataset')`. The TRAIN-tab button,
-  `tools/launch_training.py`, and the CLI `train` subcommand all pass
-  it correctly.
-- **`grid_size=0.5`** mm (NOT meters — point clouds here are ~50-80 mm
-  scale and Pointcept's default 0.001 m fails the depth ≤ 16 assertion).
-- **`batch_size=2`** fits VRAM with the standard config.
-- **`extent / grid_size < 65536`** or Pointcept's depth assertion fires.
-- **`PYTHONIOENCODING=utf-8`** in subprocess env — default cp1252 chokes
-  on tqdm em-dashes and crashes the reader thread.
-- Conda env name: **`lithium-ptv3`**.
+```bash
+python tools/launch_training.py --dataset <exported dataset folder> \
+    --python-exe <training env python> --epochs 200
+```
+
+Instead of `--python-exe`, you can set `LITHIUM_TRAIN_PYTHON`. Run it with
+`--help` for the other options (batch size, learning rate, fine-tuning from a
+checkpoint, and so on).
+
+The console on the TRAIN tab has a `train` command too:
+`train <dataset folder> [--epochs N] [--batch B]`.
+
+To drive it from Python:
+
+```python
+from src.training.config_gen import PTv3TrainParams, generate_ptv3_config
+from src.training.ptv3_runner import PointceptRunner, PointceptLaunchConfig
+
+run_dir = "<dataset>/training_runs/my_run"
+params = PTv3TrainParams(data_root="<dataset>",
+                         num_classes=0,      # 0 = read classes.json
+                         batch_size=2, epochs=200)
+generate_ptv3_config(params, "<repo>/src/training/pointcept_ext",
+                     f"{run_dir}/config.py")
+
+cfg = PointceptLaunchConfig(
+    python_exe="<training env python>",
+    pointcept_dir="<repo>/training/pointcept",
+    config_file=f"{run_dir}/config.py",
+    work_dir=run_dir,
+    pointcept_ext_dir="<repo>/src/training/pointcept_ext",
+)
+PointceptRunner().launch(cfg)
+```
+
+## Launch parameters that break runs
+
+Each of these has broken a run before:
+
+- **`pointcept_ext_dir` must be set** on `PointceptLaunchConfig`. Without it,
+  `PointceptRunner._build_command` skips the bootstrap that registers
+  Lithium's dataset class, and the data loader fails with
+  `KeyError('LithiumDataset')`. The LAUNCH TRAINING button, the console `train`
+  command and `tools/launch_training.py` all set it.
+- **`grid_size` is in the cloud's own units.** The default, `0.5`, suits
+  clouds stored in millimetres. Pointcept's upstream default assumes metres
+  and fails its depth assertion on small objects.
+- **Keep `extent / grid_size` below 65536**, where extent is the cloud's
+  largest dimension. Otherwise Pointcept's depth assertion fails.
+- **`batch_size=2`** is the default because larger batches run out of memory
+  on a 24 GB card with the default model.
+- **`PYTHONIOENCODING=utf-8`** is set for every subprocess. Without it,
+  Windows' default code page cannot decode tqdm's output and the reader thread
+  crashes.
+- **Environment name:** the tools and docs assume `lithium-ptv3`. Any name
+  works as long as POINTCEPT ENV points at its Python.

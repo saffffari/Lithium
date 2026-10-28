@@ -1,66 +1,96 @@
 # Project bundles (`.li`)
 
-A `.li` file is one project, packed to move between machines: any
-combination of its point clouds, its label layer and its trained model
-weights, plus a manifest with the project's name and ontology.
+A `.li` file packs one project so you can move it to another computer. It can
+hold any mix of the project's point clouds, its labels and its trained models,
+plus a manifest with the project's name and label set.
 
-## In the app
+## Export
 
-**File > Export Project (.li)...** — pick the project, tick what to
-include, choose a file. The dialog shows counts and sizes next to each
-checkbox and a running total.
+Choose **File > Export Project (.li)...**, pick the project, tick what to
+include, then click **Export...** and choose a file name. The dialog shows the
+count and size of each part and a running total.
 
 | Checkbox | What goes in |
 |---|---|
-| Point clouds | every cloud in the project, stripped to `coord` + `color` + `normal`. Colour is always included. Every other per-point scalar is dropped — the catalog npz files carry label-bearing layers (`labels_*`, `tips*`, `label_seed_*`) and a bundle exported *without* labels must not leak them through the scalar dropdown. |
-| Labels | the project's own label layer, one `int32` file per labelled cloud |
-| Model weights | `model_best.pth` (+ `config.py`) for every completed model in the project's registry. Leaving this off also drops the project's `active_model_id`, so INFER on the other machine never points at a checkpoint it doesn't have. |
+| Point clouds | Every cloud in the project, reduced to coordinates, colour and normals. All other per-point data is left out, so a bundle without labels cannot leak them through a stored scalar layer. |
+| Labels | The project's labels: one integer array per labelled cloud. |
+| Model weights | `model_best.pth`, plus `config.py` when the run has one, for every model in the project that has a checkpoint. Leave it unticked and the bundle also drops the project's active-model setting, so the other computer never points at a checkpoint it does not have. |
 
-**File > Import Project (.li)...** — pick the file; it imports whatever
-it contains, no further questions:
+An export is written to `<name>.li.part` and renamed when it is complete, so a
+cancelled or failed export leaves no file behind.
 
-- a **new project** named after the bundle (de-duplicated with ` (2)`),
-  or
-- a **merge** into the project the bundle was exported from when that
-  project still exists in this catalog — that is a reader's labels
-  coming home. Labels never overwrite ones the target already has.
+## Import
 
-A progress card shows the ring filling; Cancel leaves nothing behind
-(the file is written as `.part` and renamed at the end).
+Choose **File > Import Project (.li)...** and pick the file. Lithium imports
+everything the bundle contains and opens the project:
 
-## Blinded reader kit
+- If the project the bundle was exported from exists in your catalog (for
+  example, you are re-importing your own export), the bundle **merges** into
+  it.
+- Otherwise Lithium creates a **new project** with the bundle's name, adding
+  ` (2)`, ` (3)` and so on if the name is taken.
 
-Export with **Point clouds only**. The reader gets the geometry, the
-ontology and an empty label layer; no model, no label scalars. When
-they are done they export **Labels only** (a few MB) and send that
-back; importing it merges their layer into the source project.
+Imported labels **never overwrite** labels the project already has for a
+cloud. The progress card reports how many label files were written and how
+many were skipped. Labels for clouds that are not in your catalog are skipped
+too.
 
-## From the shell
+Every cloud, label and model file in a bundle carries a SHA-256 checksum. Lithium refuses a bundle
+whose contents do not match.
 
-```
+## Hand a project to a labeller
+
+1. Export with **Point clouds** only. The labeller gets the clouds and the
+   label set, but no labels and no models.
+2. The labeller imports it, labels, and exports with **Labels** only. That
+   file is usually a few MB. [Annotator onboarding](onboarding.md) walks them
+   through it.
+3. You import their file. Their labels arrive as a new project, for example
+   `My project (2)`, on the same clouds. Their copy of the project has its own
+   id, so it does not merge into yours, and labels from different people stay
+   apart.
+
+Clouds keep the same internal key on every computer. That is what lets a
+labels-only bundle land on clouds that arrived earlier in a clouds-only
+bundle.
+
+To merge returned labels into a specific project instead, use the command
+line with `--into` (below). It still never overwrites existing labels unless
+you add `--overwrite-labels`.
+
+## From the command line
+
+`tools/bundle_cli.py` runs the same code without the window. Run it with the
+Lithium environment's Python from the repo root.
+
+```bash
 python tools/bundle_cli.py export "<project name or proj:id>" --out kit.li --clouds
+python tools/bundle_cli.py export "<project>" --out full.li --clouds --labels --models
 python tools/bundle_cli.py inspect kit.li
-python tools/bundle_cli.py import kit.li                 # close Lithium first
-python tools/bundle_cli.py import labels.li --into proj:xxxxxxxx
+python tools/bundle_cli.py import kit.li [--name "New name"]
+python tools/bundle_cli.py import labels.li --into "<project name or proj:id>" [--overwrite-labels]
 ```
 
-`LITHIUM_LIBRARY_DIR` redirects the catalog for both the app and the CLI.
+- Pick at least one of `--clouds`, `--labels` and `--models` when exporting.
+- A project name can be partial if it matches only one project.
+- **Close Lithium before importing.** The catalog allows one user at a time.
+- `LITHIUM_LIBRARY_DIR` points both the app and the tool at a different
+  catalog.
+- Without `--into`, the command-line import always creates a new project.
 
-## Layout
+## File layout
+
+A bundle is an uncompressed zip:
 
 ```
-manifest.json                 format, version, project {name, source_id, ontology, settings},
-                              cloud_order, clouds[], labels[], models[], scalars_dropped
-clouds/<file_key>.npz         coord, color, scalar_normal, _meta_json
-labels/<file_key>.npy         int32 per-point ids, indexed by the project's ontology
+manifest.json                   format, version, project (name, source id, label set,
+                                settings), cloud order, and one entry per item
+clouds/<file_key>.npz           coord, color, scalar_normal, _meta_json (and pose_to_world if present)
+labels/<file_key>.npy           int32 label id per point
 models/<model_id>/model_best.pth
 models/<model_id>/config.py
 ```
 
-File keys are preserved across machines: label files are keyed by
-them, so a labels-only bundle lands on clouds imported earlier from a
-clouds-only bundle of the same project. Every item carries a SHA-256
-and the importer refuses a bundle whose contents don't match.
-
-Code: `src/data/bundle.py` (format, no GUI), `src/gui/bundle_dialog.py`
-(modal + progress card), `tests/test_bundle.py`.
+The code lives in `src/data/bundle.py` (the format, no GUI),
+`src/gui/bundle_dialog.py` (the dialog and progress card) and
+`tests/test_bundle.py`.

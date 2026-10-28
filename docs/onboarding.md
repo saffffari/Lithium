@@ -1,69 +1,86 @@
-# Getting started as an annotator
+# Labelling a shared project
 
-Lithium is the point-cloud labeller we use to mark vertebral surfaces
-(endplates, rims, pedicles, processes) on 3-D bone models. You get a
-project bundle (`.li`) with the bones already inside; you label them
-and send a small bundle of labels back.
+Someone has sent you a Lithium project as a `.li` file. It holds the point
+clouds and the list of labels to use. You install Lithium, import the file,
+paint the labels, and send back a small file that holds only your labels.
 
-## 1. Install (once, ~5 minutes)
+This page is the short version. The [user guide](user_guide.md) has
+everything else.
 
-You need Git. On Windows, [GitHub Desktop](https://desktop.github.com)
-is the simplest way to clone; on macOS/Linux use `git` in a terminal.
+## 1. Install (once)
 
-1. Clone `https://github.com/saffffari/Lithium` to a folder of your
-   choice.
-2. Open a terminal in that folder and run the setup script. It
-   installs a private Python, the packages and launches the app:
+You need:
 
+- **Git.** On Windows, [GitHub Desktop](https://desktop.github.com) is the
+  easiest way to clone. On macOS and Linux, use `git` in a terminal.
+- **A C++ compiler**, for one package that builds during setup:
+  - Windows: [Microsoft C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/),
+    "Desktop development with C++" workload
+  - macOS: `xcode-select --install`
+  - Linux: `g++` from your package manager
+- **A graphics driver with OpenGL 4.1.** Most computers from the last ten
+  years have one once the driver is up to date. You do not need an NVIDIA
+  card.
+
+Then:
+
+1. Clone `https://github.com/saffffari/Lithium` to a folder of your choice.
+2. Open a terminal in that folder and run the setup script. It installs a
+   private Python and the packages, then starts Lithium.
    - **Windows (PowerShell):** `.\setup.ps1`
      If Windows refuses to run scripts:
      `powershell -ExecutionPolicy Bypass -File .\setup.ps1`
    - **macOS / Linux:** `./setup.sh`
 
-   After the first time, start Lithium with `run.bat` (Windows) or
-   `./run.sh`.
+From then on, start Lithium with `run.bat` (Windows) or `./run.sh`.
 
-The app needs an OpenGL 4.1 GPU — most laptops from the last ten years
-with up-to-date graphics drivers are fine. No NVIDIA card is required.
+## 2. Import the project
 
-## 2. Load the project
+In Lithium, choose **File > Import Project (.li)...** and pick the file. A
+progress card shows the import and closes itself a few seconds after it finishes. The project
+opens with every cloud as a tile in the gallery.
 
-Download the `.li` file from the shared Drive folder, then in Lithium:
-**File > Import Project (.li)...** and pick it. A progress ring runs
-for a minute; the project then opens in CONTACT SHEETS with every bone
-as a tile. (The setup script can do this too: `.\setup.ps1 -Kit path\to\file.li`.)
+You can also import while installing: `.\setup.ps1 -Kit path\to\file.li` on
+Windows, or `./setup.sh --kit path/to/file.li` on macOS and Linux.
 
 ## 3. Label
 
-Press `?` inside the app for the shortcut card; its GETTING STARTED
-block is the whole loop:
+Press `?` in the app for the shortcut card. The loop is:
 
-1. Double-click a bone tile to open it in the LIGHT TABLE.
-2. Click a label (or press `G` to cycle through them).
-3. Pick a tool: pick (`P`), lasso (`O`), brush (`K`), or box from the
-   toolbar. **Hold Shift and drag** to paint the label; hold Ctrl to
-   erase it. A plain left drag pans the view.
-4. Thumb wheel, `LEFT`/`RIGHT` or `B`/`V` moves between bones. Labels
-   save themselves.
-5. `Ctrl+Z` undoes. `F` refits the view if you get lost.
+1. **Double-click** a tile to open the cloud in the **Light Table**.
+2. **Click a label** in the LABELS list, or press `G` to step through them.
+3. **Pick a tool:** pick (`P`), lasso (`O`), brush (`K`), curve (`U`), or box
+   and polygon from the toolbar at the top left of the view.
+4. **Hold Shift and drag** to paint the label (Shift+click for pick).
+   **Hold Ctrl and drag** to erase it. A plain left-drag pans the view;
+   right-drag turns it.
+5. **Move to the next cloud** with `V` or `Right`, the previous one with `B`
+   or `Left`, or a mouse thumb wheel.
 
-Your labelling protocol (which structures, which bones, in which
-order) comes separately from the study lead. Follow it exactly: the study
-compares your labels with other readers', so consistency matters more
-than speed.
+Labels save themselves after every stroke. There is no Save button.
+`Ctrl+Z` undoes. `F` refits the view if you get lost.
 
-## 4. Send labels back
+Whoever sent you the project should also tell you what to label and how.
+Follow those instructions closely. Consistency matters more than speed.
 
-**File > Export Project (.li)...**, tick **Labels** only, save the
-file (a few MB) and drop it in the shared Drive folder with your name
-and the date in the filename, e.g. `yourname_2026-11-03_labels.li`.
-Importing it on our side keeps your labels as their own project, separate
-from every other reader's.
+## 4. Send your labels back
+
+1. Choose **File > Export Project (.li)...**.
+2. Pick the project and tick **Labels** only.
+3. Click **Export...** and save the file. It is usually a few MB.
+4. Put your name in the file name, for example
+   `<project>_<your-name>_labels.li`, and send it back the way you agreed.
+
+When the sender imports your file, your labels arrive as their own project
+next to the original, so they never mix with anyone else's.
 
 ## If something breaks
 
-- `setup` says `uv` is not on PATH: close the terminal, open a new
-  one, run the script again.
-- Black window / crash on launch: update your graphics driver.
-- File dialogs don't open (Linux): install `python3-tk`.
-- Anything else: screenshot + the text in the terminal, send it over.
+- **Setup fails while building `imgui`:** install the C++ compiler above and
+  run the setup script again.
+- **Setup says `uv` is not on PATH:** close the terminal, open a new one, and
+  run the script again.
+- **Black window or crash on launch:** update your graphics driver.
+- **File dialogs don't open (Linux):** install `python3-tk`.
+- **Anything else:** take a screenshot, copy the text from the terminal, and
+  send both to whoever sent you the project.

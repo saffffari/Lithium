@@ -1,60 +1,105 @@
-# Lithium Architecture
+# Architecture
 
-A brief overview of how Lithium is put together. The code is the source of truth; `AGENTS.md` lists the authoritative files.
+A short tour of how Lithium is built. The code is the source of truth;
+[AGENTS.md](../AGENTS.md) lists the load-bearing files.
 
----
+## Overall shape
 
-## High-level shape
+Lithium is a single-process Python 3.12 desktop app: a GLFW window, a ModernGL
+OpenGL 4.1 core context, a Dear ImGui overlay and custom GLSL shaders (all
+`#version 410 core`, under `shaders/`).
 
-Lithium is a single-process Python desktop app: GLFW window, ModernGL OpenGL 4.1+ context, Dear ImGui overlay, custom GLSL shaders. The entire visible application is one `App` class in `src/main.py` owning a 3-mode view machine. Each mode is a different render path with shared camera, catalog, label registry, and undo stack. Heavy work runs as background threads (preview build, mesh Poisson, training, inference); the main thread polls futures each frame and never blocks.
+One `App` class in `src/main.py` owns everything visible. It runs three modes
+that share the camera, the catalog, the label registry and the undo stack:
 
-The three modes are **CONTACT_SHEETS** (gallery of clouds), **LIGHT_TABLE** (single-cloud inspection + labeling + measurement), and **AUTOMATION** (embedded CLI for batch operations + PT-v3 training).
+| Mode | Tab | Constant | Value |
+|---|---|---|---|
+| Contact Sheets | SHEETS | `MODE_CONTACT_SHEETS` | 1 |
+| Light Table | LIGHT | `MODE_LIGHT_TABLE` | 2 |
+| Train | TRAIN | `MODE_AUTOMATION` | 5 |
 
-## Module layering
+The values 1, 2 and 5 are kept from an older six-mode layout so saved settings
+stay valid. The constants live in `src/core/modes.py`.
+
+## Module layers
 
 ```
 core ← data ← rendering / training ← gui ← main
 ```
 
-- `core/` — camera, input, undo, tools, selection, modes, measure registry
-- `data/` — loaders (PLY/LAS/LAZ/NPZ), catalog, cloud_store, library_catalog, labels, project, model_registry, mesh_builder
-- `rendering/` — point/mesh renderers, overlays, gizmo, FBO, SSAO, post-process (+ GLSL shaders under `shaders/`)
-- `training/` — PT-v3 launch (config_gen, ptv3_runner)
-- `gui/` — ImGui panels, label/measure panels, scale, tokens, theme, OP-1 widgets, automation
-- `export/` — image and spin render export
-- `utils/` — math, file hashing
-- `main.py` — App class, GLFW event loop, mode dispatch
-- `cli.py` — headless render/spin CLI
+| Package | Contents |
+|---|---|
+| `core/` | Camera, input, undo, selection, tools, measurement registry, modes, resource budgets, label propagation, platform glue. |
+| `data/` | Loaders (PLY, LAS/LAZ, NPZ), the library catalog, the cloud store, labels, projects, the model registry, `.li` bundles, the Sandbox, the catalog lock, mesh building. |
+| `rendering/` | Point and mesh renderers, overlays, gizmo, framebuffers, SSAO, post-processing. |
+| `training/` | PT-v3 config generation (`config_gen.py`), the subprocess runner (`ptv3_runner.py`), the Pointcept dataset shim (`pointcept_ext/`), the inference contract. |
+| `gui/` | ImGui panels, label and measurement panels, the bundle dialog, the console, theme and widgets. |
+| `export/` | Screenshots, turntables, dataset export, prediction import. |
+| `utils/` | Maths, file hashing, preferences. |
+| `main.py` | `App`, the GLFW event loop, mode dispatch, key and mouse handling. |
+| `cli.py` | Headless `render` and `spin`. |
 
-No back-edges. No cycles. Mode constants live in `src/core/modes.py` (imported by panels, widgets, and automation so they don't pull in the `App` god-object).
+Lower layers never import higher ones. The one known exception is `gui/` and
+`main.py`: `App` draws the panels each frame, and a few panels reach back into
+`src.main` for helpers. That pair is deliberate and contained. Scripts in
+`tools/` import from `src` as a library and never import `App`.
 
-The one acknowledged exception: `gui/` and `main.py` form a tight bidirectional pair. The GUI panels call back into `App` for state, and `App` drives the panels each frame. This `gui → main` cycle is intentional and contained — the GUI layer is an overlay on the App god-object, not an independent module.
+## Design decisions
 
-## Key design decisions
+- **The catalog is the dataset.** Importing a cloud copies it into
+  `~/.lithium/library`. Its labels live at
+  `labels/<namespace>/<file_key>.npy`, where the namespace is the project id
+  (`_library` outside projects, `layer:<model_id>` for Sandbox layers), made
+  filesystem-safe by replacing characters such as `:` with `_`. There
+  is no separate "save project" step.
+- **Labels are written safely.** Every edit goes through the undo stack and is
+  saved by writing a temporary file and swapping it in. Label arrays are checked against
+  the cloud's point count when they are loaded. Save failures show
+  in a banner, because the packaged build has no console.
+- **Measurement anchors are cloud-local.** An anchor stores
+  `(cloud_key, local_pos)`, never a world position, so measurements follow the
+  cloud when it moves.
+- **GPU uploads happen once.** Geometry goes to the GPU at load; per frame,
+  only uniforms change.
+- **Labels have their own buffer.** Each cloud uses four vertex buffers
+  (position, colour, label, selection), so a stroke re-uploads 4 bytes per
+  point instead of 32. See `src/rendering/point_cloud_renderer.py`.
+- **Caches have budgets.** `src/core/resource_budget.py` sets how many
+  full-resolution clouds, previews and thumbnails stay resident. The active
+  cloud and the visible gallery are always kept.
 
-Highlights:
+## Threads and subprocesses
 
-- **The catalog *is* the dataset.** Once a cloud is imported, its labels live under `~/.lithium/library/labels/<namespace>/<file_key>.npy` forever (namespace = project id, or `_library` outside projects). There is no separate "save project" step.
-- **Anchors are cloud-local.** `(cloud_key, local_pos)` — never world coords. Measurements survive model-matrix changes because the resolver applies the current model matrix at eval time.
-- **GPU per-stroke label upload is 4 MB, not 32 MB**, via the 4-VBO split in `src/rendering/point_cloud_renderer.py`.
-- **GPU uploads happen once.** Cloud geometry is uploaded to VBOs at load time; only uniforms change per frame.
-- **All subprocesses go through the PointceptRunner template** — Popen + daemon reader thread + status state machine + `PYTHONIOENCODING=utf-8`. Reader threads push events into a main-thread deque; they never mutate `App.*` directly.
+The main thread owns the frame loop and all OpenGL work. Background threads
+load files, build previews and meshes, import and export bundles, and run the
+training and inference subprocesses. The main thread polls their results each
+frame and never blocks.
 
-## Threading model
+Worker threads never change `App` state directly. They post events to a
+main-thread queue that the frame loop drains.
 
-Background threads load files, build previews/meshes, and run the PT-v3 training/inference subprocesses. The main thread owns the GLFW frame loop and all GPU work, polling futures each frame. Nothing that touches GL or `App.*` state runs off the main thread; subprocess reader threads communicate exclusively through a main-thread-drained deque.
+Training runs through `PointceptRunner` (`src/training/ptv3_runner.py`):
+`Popen`, a daemon thread that reads the output, and a status object the TRAIN
+tab displays. Every subprocess gets `PYTHONIOENCODING=utf-8`. The subprocesses
+run in a separate conda environment with PyTorch and Pointcept; see
+[Training setup](training_setup.md).
 
-## Subprocess venvs
+## Packaging
 
-- conda env `lithium-ptv3` — Pointcept PT-v3 training
+`lithium.spec` builds a windowed PyInstaller app that bundles `shaders/` and
+`assets/`. `packaging/lithium.iss` wraps the Windows build in a per-user
+installer. `.github/workflows/release.yml` builds Windows, Linux and macOS
+artifacts for `v*` tags and attaches them to a draft release.
+`.github/workflows/test.yml` runs the tests on Windows and Linux for every push
+and pull request.
 
-See [docs/training_setup.md](training_setup.md) for the PT-v3 env recipe.
-
-## Where docs live
+## Other docs
 
 | What | Where |
 |---|---|
-| Project conventions + tech stack | [CLAUDE.md](../CLAUDE.md) |
-| AI agent orientation | [AGENTS.md](../AGENTS.md) |
-| User-facing workflows | [user_guide.md](user_guide.md) |
-| Training env setup | [training_setup.md](training_setup.md) |
+| Using the app | [user_guide.md](user_guide.md) |
+| Labelling a shared project | [onboarding.md](onboarding.md) |
+| The `.li` format | [bundles.md](bundles.md) |
+| The training environment | [training_setup.md](training_setup.md) |
+| macOS | [macos.md](macos.md) |
+| Conventions for contributors and coding agents | [CLAUDE.md](../CLAUDE.md), [AGENTS.md](../AGENTS.md) |
